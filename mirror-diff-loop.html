@@ -1,0 +1,415 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Forge — Mirror diff loop</title>
+<style>
+:root{
+  --base:#121417;--panel:#181B20;--elev:#1F242B;--hover:#1C2128;--sel:#272E36;--input:#0E1013;--code:#0E1116;
+  --b-subtle:#21252B;--b-def:#2C313A;--b-strong:#444A54;
+  --t-pri:#E6E8EB;--t-sec:#9AA0A6;--t-mut:#6B6F78;--t-code:#B8C0CC;
+  --ac:#22C55E;--ac-h:#4ADE80;--ac-br:#86EFAC;--ac-soft:#0E2818;--ac-glow:rgba(74,222,128,.35);
+  --am:#E0B24D;--am-soft:#2A2310;--ok:#6FAE8C;--warn:#C7A77B;--dng:#CC8585;--info:#88A9C4;--purple:#C49AD0;
+  --mono:"SF Mono",ui-monospace,"JetBrains Mono",Menlo,Consolas,monospace;--sans:-apple-system,"Inter","Segoe UI",Roboto,sans-serif;--ease:cubic-bezier(0.2,0,0,1);
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%}
+body{background:#08090b;font-family:var(--sans);color:var(--t-pri);font-size:12px;-webkit-font-smoothing:antialiased;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;overflow:hidden;height:100vh}
+.tool-window{width:1480px;height:860px;background:var(--base);border:1px solid var(--b-def);border-radius:8px;display:grid;grid-template-rows:40px 28px 1fr 26px;overflow:hidden;box-shadow:0 24px 80px rgba(0,0,0,.6)}
+.mono{font-family:var(--mono)}
+.toolbar{display:flex;align-items:center;gap:10px;padding:0 12px;background:var(--panel);border-bottom:1px solid var(--b-subtle)}
+.glyph{width:20px;height:20px;border-radius:6px;background:linear-gradient(145deg,#22C55E,#16833f);display:flex;align-items:center;justify-content:center;font-weight:700;font-size:12px;color:#06140b;box-shadow:0 0 12px var(--ac-glow)}
+.brand{font-size:15px;font-weight:600}.brand .sub{color:var(--t-mut);font-weight:400;font-size:11px;margin-left:4px}
+.spacer{flex:1}
+.badge{font-family:var(--mono);font-size:9px;color:var(--t-mut);border:1px solid var(--b-def);border-radius:999px;padding:3px 8px}.badge b{color:var(--ac-h)}
+.livepill{display:flex;align-items:center;gap:6px;font-size:11px;color:var(--t-sec);border:1px solid var(--b-def);border-radius:999px;padding:3px 9px}
+.dot{width:7px;height:7px;border-radius:50%;background:var(--ac);box-shadow:0 0 8px var(--ac)}.dot.pulse{animation:breath 2.2s var(--ease) infinite}
+@keyframes breath{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.45;transform:scale(.78)}}
+.mode{display:flex;align-items:center;gap:2px;padding:0 10px;background:var(--base);border-bottom:1px solid var(--b-subtle)}
+.m{position:relative;padding:0 12px;height:28px;line-height:28px;font-size:12px;color:var(--t-sec)}
+.m.on{color:var(--t-pri);font-weight:500}
+.m.on .under{position:absolute;left:8px;right:8px;bottom:0;height:2px;background:var(--ac);border-radius:2px;box-shadow:0 0 8px var(--ac-glow)}
+.m .gaps{margin-left:6px;font-size:10px;color:var(--ac-br);background:var(--ac-soft);border-radius:999px;padding:1px 6px}
+.mode .right{margin-left:auto;font-family:var(--mono);font-size:10px;color:var(--t-mut)}.mode .right b{color:var(--ac-h)}
+.main{display:grid;grid-template-columns:248px 1.35fr 320px;gap:1px;background:var(--b-subtle);overflow:hidden}
+.col{background:var(--panel);display:flex;flex-direction:column;min-height:0;overflow:hidden}.col.stage{background:var(--base)}
+.pane-head{height:40px;flex:0 0 40px;display:flex;align-items:center;gap:8px;padding:0 12px;border-bottom:1px solid var(--b-subtle)}
+.pane-head .ttl{font-size:13px;font-weight:600}.pane-head .meta{margin-left:auto;font-size:10px;color:var(--t-mut);font-family:var(--mono)}
+.scroll{overflow:hidden;flex:1;min-height:0}
+.legend{display:flex;flex-wrap:wrap;gap:8px 12px;padding:8px 12px;font-size:9px;color:var(--t-mut);border-bottom:1px solid var(--b-subtle)}
+.legend span{display:flex;align-items:center;gap:4px}.sw{width:9px;height:9px;border-radius:2px;border:1px solid}
+.sw.ok{background:var(--ac-soft);border-color:var(--ac-br)}.sw.drift{background:var(--am-soft);border-color:var(--am)}
+.sw.broken{background:#2A1414;border-color:var(--dng)}.sw.miss{background:#241626;border-color:var(--purple);border-style:dotted}
+.row{display:flex;align-items:center;height:26px;padding-right:8px;font-size:12px;color:var(--t-sec);white-space:nowrap;cursor:pointer;border-left:2px solid transparent}
+.row:hover{background:var(--hover)}.row.sel{background:var(--sel);border-left-color:var(--ac);color:var(--t-pri)}
+.tw{width:14px;text-align:center;color:var(--t-mut);font-size:9px;flex:0 0 14px}.row .nm i{color:var(--t-mut);font-style:italic}
+.gapchip{margin-left:auto;font-family:var(--mono);font-size:9px;padding:1px 5px;border-radius:999px;border:1px solid var(--b-def);color:var(--t-mut)}
+.gapchip.ok{color:var(--ac-br);border-color:#1c3a28}.gapchip.warn{color:var(--am);border-color:#3a3015;background:var(--am-soft)}
+.gapchip.bad{color:var(--dng);border-color:#3a1c1c;background:#1f1313}.gapchip.miss{color:var(--purple);border-style:dotted}
+.gapchip.fixed{color:var(--ac-br);border-color:#1c3a28;background:rgba(34,197,94,.07)}
+.recomp{font-family:var(--mono);font-size:9px;color:var(--am);margin-left:6px;animation:flick 1s steps(2) infinite}
+@keyframes flick{50%{opacity:.5}}
+.stage-head{height:40px;flex:0 0 40px;display:flex;align-items:center;gap:10px;padding:0 12px;border-bottom:1px solid var(--b-subtle)}
+.seg{display:flex;border:1px solid var(--b-def);border-radius:6px;overflow:hidden}
+.seg button{background:transparent;border:0;color:var(--t-sec);font-size:11px;padding:4px 10px;border-right:1px solid var(--b-def);cursor:pointer}
+.seg button:last-child{border-right:0}.seg button.on{background:var(--ac-soft);color:var(--ac-br)}
+.stage-head .meta{margin-left:auto;font-family:var(--mono);font-size:10px;color:var(--t-mut)}
+.stage-body{flex:1;min-height:0;position:relative;display:flex;align-items:center;justify-content:center;background:radial-gradient(120% 90% at 50% 35%,#16191e 0%,#0e1013 70%)}
+.hud{position:absolute;background:rgba(20,23,27,.62);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);border:1px solid var(--b-def);border-radius:8px;padding:10px 12px;z-index:6}
+.hud.meter{top:18px;left:18px;min-width:152px}
+.hud.meter .lbl{font-size:9px;letter-spacing:1.4px;color:var(--t-mut)}
+.hud.meter .big{font-family:var(--mono);font-size:34px;line-height:1;color:var(--ac-br);font-weight:600;margin:3px 0 2px}
+.hud.meter .delta{font-size:10px;color:var(--ac-h)}
+.ring{height:4px;background:#23272e;border-radius:999px;margin-top:8px;overflow:hidden}
+.ring i{display:block;height:100%;width:91%;background:linear-gradient(90deg,var(--ac),var(--ac-h));box-shadow:0 0 8px var(--ac-glow);transition:width .55s var(--ease)}
+.hud.heat{top:18px;right:18px;display:flex;align-items:center;gap:8px}
+.hud.heat .pp{width:8px;height:8px;border-radius:50%;background:var(--am);box-shadow:0 0 10px var(--am);animation:flick 1s steps(2) infinite}
+.hud.heat .txt{font-size:10px;color:var(--t-sec)}.hud.heat .txt b{font-family:var(--mono);color:var(--am)}
+.phone{position:relative;width:280px;height:600px;border-radius:26px;background:#05070a;border:1px solid #2a3038;box-shadow:0 30px 70px rgba(0,0,0,.6),inset 0 0 0 6px #0c0f13;padding:6px}
+.notch{position:absolute;top:10px;left:50%;transform:translateX(-50%);width:96px;height:18px;background:#05070a;border-radius:0 0 12px 12px;z-index:5}
+.layer{position:absolute;inset:6px;border-radius:20px;overflow:hidden}
+.screen{position:absolute;inset:0;background:#0f1216;display:flex;flex-direction:column}
+.s-bar{height:22px;display:flex;align-items:center;justify-content:space-between;padding:0 14px;font-size:8px;color:#7a828c;font-family:var(--mono)}
+.s-appbar{height:44px;display:flex;align-items:center;gap:8px;padding:0 12px;border-bottom:1px solid #1b2026}
+.s-av{width:26px;height:26px;border-radius:50%;background:linear-gradient(135deg,#3a4250,#222833)}
+.s-title{font-size:11px;font-weight:600;color:#e6e8eb;transition:font-size .3s var(--ease)}.s-title .st{display:block;font-size:8px;color:#6FAE8C;font-weight:400}
+.s-appbar .s-ic{margin-left:auto;color:#6b727c;font-size:13px}
+.s-list{flex:1;padding:12px 12px 8px;display:flex;flex-direction:column;gap:10px;overflow:hidden}
+.bub{max-width:74%;padding:8px 10px;font-size:10px;line-height:1.35}
+.bub.them{align-self:flex-start;background:#1c222b;color:#cfd4da;border-radius:14px 14px 14px 4px}
+.bub.me{align-self:flex-end;background:#173a26;color:#bdf0d0;border-radius:14px 14px 4px 14px;transition:border-radius .3s var(--ease)}
+.s-composer{height:44px;display:flex;align-items:center;gap:8px;padding:0 12px;border-top:1px solid #1b2026}
+.s-field{flex:1;height:26px;border-radius:14px;background:#161b21;border:1px solid #232a31}
+.s-send{width:30px;height:30px;border-radius:50%;background:var(--ac);box-shadow:0 0 10px var(--ac-glow);display:flex;align-items:center;justify-content:center;color:#06140b;font-size:13px;transition:all .3s var(--ease)}
+.s-fab{position:absolute;right:14px;bottom:58px;width:30px;height:30px;border-radius:50%;background:#1c222b;border:1px solid #2a323c;display:flex;align-items:center;justify-content:center;color:#8a929c;font-size:13px;transition:opacity .3s}
+.l-design{z-index:4}
+.l-live{clip-path:inset(0 0 0 50%);z-index:3}
+.l-live.heat{clip-path:none;opacity:.9;filter:saturate(.6)}
+/* live drift (corrected as fixes land) */
+.l-live .s-title{font-size:13px}.l-live .s-title .st{color:#7a828c}
+.l-live.title-fixed .s-title{font-size:11px}
+.l-live .bub.me{border-radius:8px}
+.l-live.corner-fixed .bub.me{border-radius:14px 14px 4px 14px}
+.l-live .s-send{background:#2A3A30;box-shadow:none;color:#6b727c}
+.l-live.send-fixed .s-send{background:var(--ac);box-shadow:0 0 10px var(--ac-glow);color:#06140b}
+.l-live .s-fab{display:none}
+.l-live.fab-fixed .s-fab{display:flex}
+.seam{position:absolute;top:6px;bottom:6px;width:2px;background:var(--ac);box-shadow:0 0 10px var(--ac-glow);left:50%;z-index:7;cursor:ew-resize;transition:left .35s var(--ease)}
+.seam.dragging{transition:none}
+.handle{position:absolute;width:26px;height:26px;border-radius:50%;background:#0f1316;border:2px solid var(--ac);color:var(--ac-br);display:flex;align-items:center;justify-content:center;font-size:12px;box-shadow:0 0 14px var(--ac-glow);left:calc(50% - 13px);top:280px;z-index:8;cursor:ew-resize;transition:left .35s var(--ease)}
+.handle.dragging{transition:none}
+.tagL,.tagR{position:absolute;top:6px;font-size:8px;font-family:var(--mono);letter-spacing:1px;z-index:7;padding:2px 5px;border-radius:3px;background:rgba(8,10,12,.7)}
+.tagL{left:8px;color:var(--ac-br)}.tagR{right:8px;color:var(--am)}
+.hot{position:absolute;z-index:8;border:1.5px dashed;border-radius:6px;cursor:pointer;transition:opacity .3s var(--ease),box-shadow .15s var(--ease)}
+.hot .tg{position:absolute;top:-14px;left:0;font-family:var(--mono);font-size:8px;padding:0 4px;border-radius:3px;background:rgba(8,10,12,.85)}
+.hot.am{border-color:var(--am)}.hot.am .tg{color:var(--am)}.hot.rd{border-color:var(--dng)}.hot.rd .tg{color:var(--dng)}
+.hot.pu{border-color:var(--purple);border-style:dotted}.hot.pu .tg{color:var(--purple)}
+.hot.dim{opacity:.28}.hot.sel{box-shadow:0 0 0 2px rgba(255,255,255,.08),0 0 14px currentColor}
+.hot.fixed{opacity:0;pointer-events:none}
+.hint{position:absolute;bottom:20px;left:50%;transform:translateX(-50%);font-size:11px;color:var(--ac-br);background:rgba(8,10,12,.7);border:1px solid var(--b-def);border-radius:999px;padding:5px 12px;z-index:9;backdrop-filter:blur(6px);opacity:0;transition:opacity .35s}
+.hint.show{opacity:1}
+.stage-foot{height:34px;flex:0 0 34px;display:flex;align-items:center;gap:12px;padding:0 12px;border-top:1px solid var(--b-subtle)}
+.chip{font-size:10px;color:var(--t-sec);border:1px solid var(--b-def);border-radius:999px;padding:3px 9px;cursor:pointer}
+.chip.on{color:var(--ac-br);border-color:#1c3a28;background:var(--ac-soft)}
+.onion{margin-left:auto;display:flex;align-items:center;gap:8px;font-size:9px;color:var(--t-mut);font-family:var(--mono)}.onion input{width:130px;accent-color:var(--ac)}
+/* inspector */
+.findings-h{padding:10px 12px 6px;font-size:10px;color:var(--t-mut);letter-spacing:.4px;text-transform:uppercase}
+.find{margin:0 12px 8px;border:1px solid var(--b-def);border-radius:6px;background:var(--panel);overflow:hidden;cursor:pointer;transition:opacity .3s,border-color .2s}
+.find .fh{display:flex;align-items:center;gap:8px;padding:8px 10px}
+.find .fh .fd{width:7px;height:7px;border-radius:50%;flex:0 0 7px}
+.find.rd .fd{background:var(--dng)}.find.am .fd{background:var(--am)}.find.pu .fd{background:var(--purple)}
+.find .fh .ft{font-size:11px;color:var(--t-pri)}.find .fh .fl{margin-left:auto;font-family:var(--mono);font-size:9px;color:var(--t-mut)}
+.find.sel{border-color:var(--b-strong);box-shadow:0 0 0 1px rgba(255,255,255,.04)}
+.find .body{display:none;border-top:1px solid var(--b-subtle);padding:9px 10px}.find.open .body{display:block}
+.find.done .fd{background:var(--ac)!important}.find.done .ft{color:var(--t-mut);text-decoration:line-through}
+.find.done .fl{color:var(--ac-br)}.find.done{opacity:.7}
+.kv{font-family:var(--mono);font-size:10px;margin-bottom:8px}
+.kv div{display:flex;justify-content:space-between;padding:2px 0;border-bottom:1px dotted #20252c}
+.kv .k{color:var(--t-mut)}.kv .ev{color:var(--ac-br)}.kv .dv{color:var(--dng)}.kv .nu{color:var(--t-code)}
+.diff{font-family:var(--mono);font-size:10px;background:var(--code);border:1px solid var(--b-subtle);border-radius:4px;padding:7px 8px;line-height:1.5;margin-bottom:8px}
+.diff .rm{color:var(--dng)}.diff .ad{color:var(--ac-br)}.diff .fn{color:var(--t-mut);display:block;margin-top:4px}
+.acts{display:flex;gap:6px;flex-wrap:wrap}
+.act{font-size:10px;border:1px solid var(--b-def);border-radius:4px;padding:5px 8px;color:var(--t-sec);background:transparent;cursor:pointer;transition:all .12s var(--ease)}
+.act:hover{background:var(--hover);color:var(--t-pri)}.act.p{background:var(--ac-soft);color:var(--ac-br);border-color:#1c3a28}.act.p:hover{background:#123420}
+.accept{margin:6px 12px 12px;border:1px solid #1c3a28;border-radius:8px;background:linear-gradient(180deg,rgba(34,197,94,.10),rgba(34,197,94,.03));padding:12px;opacity:0;transform:translateY(8px);transition:all .35s var(--ease);pointer-events:none}
+.accept.show{opacity:1;transform:none;pointer-events:auto}
+.accept .ah{font-size:12px;color:var(--ac-br);font-weight:600;margin-bottom:4px;display:flex;align-items:center;gap:6px}
+.accept .as{font-size:10px;color:var(--t-sec);font-family:var(--mono);margin-bottom:9px}
+.accept .ab{width:100%;border:0;border-radius:6px;padding:8px;font-size:12px;font-weight:600;background:var(--ac);color:#06140b;box-shadow:0 0 14px var(--ac-glow);cursor:pointer;animation:armpulse 1.5s var(--ease) infinite}
+@keyframes armpulse{0%,100%{box-shadow:0 0 14px var(--ac-glow)}50%{box-shadow:0 0 24px var(--ac-glow)}}
+.statusbar{display:flex;align-items:center;gap:16px;padding:0 12px;background:var(--panel);border-top:1px solid var(--b-subtle);font-size:10px;color:var(--t-mut);font-family:var(--mono)}
+.statusbar b{color:var(--ac-br)}.statusbar .s-ok{color:var(--ok)}.statusbar .sp{margin-left:auto}
+#toast{position:fixed;bottom:96px;left:50%;transform:translateX(-50%) translateY(10px);background:var(--elev);border:1px solid var(--b-strong);border-radius:6px;padding:9px 14px;font-size:11px;color:var(--t-pri);opacity:0;pointer-events:none;transition:all .22s var(--ease);z-index:30;box-shadow:0 12px 30px rgba(0,0,0,.5)}
+#toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+#toast .tdot{display:inline-block;width:6px;height:6px;border-radius:50%;background:var(--ac);margin-right:7px;box-shadow:0 0 6px var(--ac)}
+/* director */
+.director{width:1480px;display:flex;align-items:center;gap:14px;padding:10px 14px;background:#0e1014;border:1px solid var(--b-def);border-radius:8px}
+.director .play{background:var(--ac);color:#06140b;border:0;border-radius:6px;padding:7px 16px;font-weight:600;font-size:12px;cursor:pointer}
+.director .play:hover{background:var(--ac-h)}
+.director .replay{background:transparent;border:1px solid var(--b-def);color:var(--t-sec);border-radius:6px;padding:7px 12px;cursor:pointer;font-size:12px}
+.beats{display:flex;gap:6px;margin-left:8px}
+.beat{display:flex;align-items:center;gap:7px;font-size:11px;color:var(--t-mut);cursor:pointer;padding:4px 8px;border-radius:999px}
+.beat .bd{width:7px;height:7px;border-radius:50%;background:#2c3640}
+.beat.on{color:var(--ac-br);background:var(--ac-soft)}.beat.on .bd{background:var(--ac);box-shadow:0 0 8px var(--ac-glow)}.beat.done .bd{background:var(--ok)}
+.director .cap{margin-left:auto;font-family:var(--mono);font-size:10px;color:var(--t-sec)}
+</style>
+</head>
+<body>
+<div class="tool-window">
+  <div class="toolbar">
+    <div class="glyph">F</div><div class="brand">Forge<span class="sub">· D2C · live inspector</span></div>
+    <div class="spacer"></div>
+    <div class="badge">d2c-engine ⇆ stdio · <b>live view-tree bridge</b></div>
+    <div class="livepill"><span class="dot pulse"></span> Pixel 8 · API 34 · live</div>
+  </div>
+  <div class="mode">
+    <div class="m">Generate</div>
+    <div class="m on">Mirror<span class="gaps" id="mGaps">4 gaps</span><span class="under"></span></div>
+    <div class="m">Eval &amp; History</div>
+    <div class="right">screen: <b>ChatThreadScreen</b> · auto-diff on save</div>
+  </div>
+
+  <div class="main">
+    <!-- LEFT -->
+    <div class="col">
+      <div class="pane-head"><span class="ttl">Hierarchy</span><span class="meta">design ⇄ live</span></div>
+      <div class="legend"><span><i class="sw ok"></i>matched</span><span><i class="sw drift"></i>drift</span><span><i class="sw broken"></i>broken</span><span><i class="sw miss"></i>missing</span></div>
+      <div class="scroll" id="tree">
+        <div class="row" style="padding-left:6px"><span class="tw">▾</span><span class="nm">ChatThreadScreen</span><span class="gapchip ok" id="cRoot">91%</span></div>
+        <div class="row" style="padding-left:24px"><span class="tw">▾</span><span class="nm">TopAppBar</span><span class="gapchip warn">82%</span></div>
+        <div class="row" data-find="title" style="padding-left:42px"><span class="tw">·</span><span class="nm">Text "Aria Chen"</span><span class="gapchip warn" id="cTitle">font</span></div>
+        <div class="row" style="padding-left:42px"><span class="tw">·</span><span class="nm">Image avatar</span><span class="gapchip ok">ok</span></div>
+        <div class="row" style="padding-left:24px"><span class="tw">▾</span><span class="nm">LazyColumn messages</span><span class="gapchip ok">94%</span><span class="recomp">↻42/s</span></div>
+        <div class="row" style="padding-left:42px"><span class="tw">·</span><span class="nm">Bubble (them)</span><span class="gapchip ok">96%</span></div>
+        <div class="row" data-find="corner" style="padding-left:42px"><span class="tw">·</span><span class="nm">Bubble (me)</span><span class="gapchip bad" id="cCorner">corner</span></div>
+        <div class="row" style="padding-left:24px"><span class="tw">▾</span><span class="nm">Composer Row</span><span class="gapchip warn">79%</span></div>
+        <div class="row" data-find="send" style="padding-left:42px"><span class="tw">·</span><span class="nm">SendButton</span><span class="gapchip bad" id="cSend">color</span><span class="recomp" id="rSend">↻7/s</span></div>
+        <div class="row" data-find="fab" style="padding-left:42px"><span class="tw">·</span><span class="nm"><i>ScrollToBottom FAB</i></span><span class="gapchip miss" id="cFab">missing</span></div>
+      </div>
+    </div>
+
+    <!-- CENTER -->
+    <div class="col stage">
+      <div class="stage-head">
+        <div class="seg" id="seg"><button class="on" data-v="swipe">Swipe</button><button data-v="onion">Onion</button><button data-v="side">Side-by-side</button><button data-v="heat">Diff-heat</button></div>
+        <div class="meta">1080×2400 px · density 420dpi · status/nav cropped</div>
+      </div>
+      <div class="stage-body">
+        <div class="hud meter"><div class="lbl">MIRROR GAP</div><div class="big mono" id="gapNum">9%</div><div class="delta" id="gapDelta">▾ closed 12% this session</div><div class="ring"><i id="gapRing"></i></div></div>
+        <div class="hud heat"><span class="pp"></span><span class="txt">live recompose <b id="recomp">49</b> / s</span></div>
+
+        <div class="phone" id="phone">
+          <div class="notch"></div>
+          <div class="layer l-design">
+            <div class="screen">
+              <div class="s-bar"><span>9:41</span><span>▮▮ ▾ ▰</span></div>
+              <div class="s-appbar"><div class="s-av"></div><div class="s-title">Aria Chen<span class="st">online</span></div><div class="s-ic">⋮</div></div>
+              <div class="s-list"><div class="bub them">Hey! are we still on for the design review?</div><div class="bub me">yes — pushing the build now 🚀</div><div class="bub them">love it. ping me when it's up</div></div>
+              <div class="s-composer"><div class="s-field"></div><div class="s-send">➤</div></div>
+              <div class="s-fab">▾</div>
+            </div>
+          </div>
+          <div class="layer l-live" id="live">
+            <div class="screen">
+              <div class="s-bar"><span>9:41</span><span>▮▮ ▾ ▰</span></div>
+              <div class="s-appbar"><div class="s-av"></div><div class="s-title">Aria Chen<span class="st">online</span></div><div class="s-ic">⋮</div></div>
+              <div class="s-list"><div class="bub them">Hey! are we still on for the design review?</div><div class="bub me">yes — pushing the build now 🚀</div><div class="bub them">love it. ping me when it's up</div></div>
+              <div class="s-composer"><div class="s-field"></div><div class="s-send">➤</div></div>
+              <div class="s-fab">▾</div>
+            </div>
+          </div>
+          <div class="tagL">DESIGN</div><div class="tagR">LIVE APP</div>
+          <div class="seam" id="seam"></div><div class="handle" id="handle">⇄</div>
+          <div class="hot am" data-find="title" id="hA" style="top:54px;left:64px;width:120px;height:20px"><span class="tg">A · font</span></div>
+          <div class="hot rd" data-find="corner" id="hB" style="top:150px;left:78px;width:130px;height:34px"><span class="tg">B · corner</span></div>
+          <div class="hot rd" data-find="send" id="hC" style="bottom:60px;right:18px;width:34px;height:34px"><span class="tg">C · color</span></div>
+          <div class="hot pu" data-find="fab" id="hD" style="bottom:96px;right:16px;width:36px;height:36px"><span class="tg">D · missing</span></div>
+          <div class="hint" id="hint">drag the seam to compare ⇄</div>
+        </div>
+      </div>
+      <div class="stage-foot">
+        <span class="chip on">Hotspots</span><span class="chip">Bounds</span><span class="chip">Recompose-heat</span>
+        <div class="onion">DESIGN<input type="range" id="onion" min="0" max="100" value="50">LIVE</div>
+      </div>
+    </div>
+
+    <!-- RIGHT -->
+    <div class="col">
+      <div class="pane-head"><span class="ttl">Gap Inspector</span><span class="meta" id="rMeta">tap a hotspot</span></div>
+      <div class="scroll">
+        <div class="findings-h">Findings · ranked by gap × recompose</div>
+        <div class="find rd" data-find="send" id="f1">
+          <div class="fh"><span class="fd"></span><span class="ft">Send button color is unbound</span><span class="fl">↻7/s</span></div>
+          <div class="body">
+            <div class="kv"><div><span class="k">attr</span><span class="nu">backgroundTint</span></div><div><span class="k">expected</span><span class="ev">@color/accent #22C55E</span></div><div><span class="k">on device</span><span class="dv">#2A3A30 (theme fallback)</span></div></div>
+            <div class="diff"><span class="rm">- Modifier.background(color = LocalContent.current)</span><br><span class="ad">+ Modifier.background(color = AppTheme.accent)  // bound</span><span class="fn">ChatThread.kt:84</span></div>
+            <div class="acts"><button class="act p" data-apply="send">Apply to live ▸</button><button class="act" data-fix="send">Fix in code</button><button class="act">Go to source</button></div>
+          </div>
+        </div>
+        <div class="find rd" data-find="corner" id="f2">
+          <div class="fh"><span class="fd"></span><span class="ft">Me-bubble corner radius</span><span class="fl">14→8dp</span></div>
+          <div class="body">
+            <div class="diff"><span class="rm">- RoundedCornerShape(8.dp)</span><br><span class="ad">+ RoundedCornerShape(14.dp,14.dp,4.dp,14.dp)</span><span class="fn">MessageBubble.kt:31</span></div>
+            <div class="acts"><button class="act p" data-apply="corner">Apply to live ▸</button><button class="act" data-fix="corner">Fix in code</button></div>
+          </div>
+        </div>
+        <div class="find am" data-find="title" id="f3">
+          <div class="fh"><span class="fd"></span><span class="ft">Title font size drift</span><span class="fl">11→13sp</span></div>
+          <div class="body">
+            <div class="diff"><span class="rm">- fontSize = 13.sp</span><br><span class="ad">+ style = AppTheme.typography.p1_bold  // 11sp</span><span class="fn">TopBar.kt:22</span></div>
+            <div class="acts"><button class="act p" data-apply="title">Apply to live ▸</button><button class="act" data-fix="title">Fix in code</button></div>
+          </div>
+        </div>
+        <div class="find pu" data-find="fab" id="f4">
+          <div class="fh"><span class="fd"></span><span class="ft">Scroll-to-bottom FAB missing</span><span class="fl">in design</span></div>
+          <div class="body">
+            <div class="kv"><div><span class="k">node</span><span class="nu">FloatingActionButton</span></div><div><span class="k">status</span><span class="dv">present in design · absent on device</span></div></div>
+            <div class="acts"><button class="act p" data-fix="fab">Generate &amp; insert</button><button class="act">Ignore</button></div>
+          </div>
+        </div>
+
+        <div class="accept" id="accept">
+          <div class="ah">✓ Gap closed — 99% fidelity</div>
+          <div class="as">→ writes 3 files into <b style="color:#86EFAC">app/src/main/.../chat/</b><br>sandbox overrides revert on accept</div>
+          <button class="ab">Send to my module ▸</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="statusbar">
+    <span class="s-ok">● local engine offline-mode</span>
+    <span>render: <b>Roborazzi UT 0.8s</b></span>
+    <span>fidelity: <b id="stFid">91%</b></span>
+    <span>code quality: <b id="stQual">87%</b></span>
+    <span class="sp" id="stLast">4 gaps open · on save</span>
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<div class="director">
+  <button class="play" id="playBtn">▶ Play the loop</button>
+  <button class="replay" id="replayBtn">⟲ Reset</button>
+  <div class="beats" id="beats">
+    <div class="beat" data-s="0"><span class="bd"></span>Mirror</div>
+    <div class="beat" data-s="1"><span class="bd"></span>Wipe</div>
+    <div class="beat" data-s="2"><span class="bd"></span>Inspect</div>
+    <div class="beat" data-s="3"><span class="bd"></span>Apply-live</div>
+    <div class="beat" data-s="4"><span class="bd"></span>Fix-code</div>
+    <div class="beat" data-s="5"><span class="bd"></span>Converge</div>
+  </div>
+  <div class="cap" id="dirCap">wipe → inspect → apply / fix → the gap closes → accept</div>
+</div>
+
+<script>
+(function(){
+  var $=function(id){return document.getElementById(id);};
+  var timers=[],gap=9,fid=91,qual=87,mode='swipe',pct=50;
+  function after(ms,fn){var t=setTimeout(fn,ms);timers.push(t);return t;}
+  function clearAll(){timers.forEach(clearTimeout);timers=[];}
+  function setBeat(n){[].forEach.call($('beats').children,function(b){var s=+b.dataset.s;b.classList.toggle('on',s===n);b.classList.toggle('done',s<n);});}
+  function cap(t){$('dirCap').textContent=t;}
+
+  function setSeam(p,instant){pct=Math.max(2,Math.min(98,p));
+    $('live').style.clipPath=(mode==='swipe')?('inset(0 0 0 '+pct+'%)'):$('live').style.clipPath;
+    $('seam').classList.toggle('dragging',!!instant);$('handle').classList.toggle('dragging',!!instant);
+    $('seam').style.left=pct+'%';$('handle').style.left='calc('+pct+'% - 13px)';$('onion').value=pct;}
+  setSeam(50);
+
+  function countTo(el,from,to,ms,suffix){var t0=performance.now();(function f(now){var k=Math.min(1,(now-t0)/ms);var v=Math.round(from+(to-from)*k);el.textContent=v+(suffix||'');if(k<1)requestAnimationFrame(f);})(t0);}
+  function setGap(v){countTo($('gapNum'),gap,v,500,'%');$('gapRing').style.width=(100-v)+'%';var d=12+(9-v);$('gapDelta').textContent='▾ closed '+d+'% this session';gap=v;}
+  function setFid(v){countTo($('stFid'),fid,v,500,'%');fid=v;}
+  function setQual(v){countTo($('stQual'),qual,v,500,'%');qual=v;}
+
+  var toast=$('toast'),tt;
+  function showToast(m){toast.innerHTML='<span class="tdot"></span>'+m;toast.classList.add('show');clearTimeout(tt);tt=setTimeout(function(){toast.classList.remove('show');},2400);}
+
+  function select(id){
+    document.querySelectorAll('.hot').forEach(function(h){var on=h.dataset.find===id;h.classList.toggle('sel',on);h.classList.toggle('dim',!h.classList.contains('fixed')&&!on);});
+    document.querySelectorAll('.find').forEach(function(f){var on=f.dataset.find===id;f.classList.toggle('open',on);f.classList.toggle('sel',on);if(on)f.scrollIntoView({block:'nearest'});});
+    document.querySelectorAll('#tree .row').forEach(function(r){r.classList.toggle('sel',r.dataset.find===id);});
+    $('rMeta').textContent='node selected';
+  }
+  function clearSel(){document.querySelectorAll('.hot').forEach(function(h){h.classList.remove('sel','dim');});document.querySelectorAll('.find').forEach(function(f){f.classList.remove('open','sel');});document.querySelectorAll('#tree .row').forEach(function(r){r.classList.remove('sel');});}
+
+  function applyLive(id){
+    $('live').classList.add(id+'-fixed');
+    showToast('Pushed to live via <b style="color:#86EFAC">modify_view_properties</b> — device repainted, gap recomputing…');
+    if(id==='send'){setGap(7);$('rSend').style.display='none';}
+  }
+  function fixCode(id,toGap,toFid){
+    $('live').classList.add(id+'-fixed');
+    var f=document.querySelector('.find[data-find='+id+']');if(f){f.classList.add('done');f.classList.remove('open','sel');}
+    var h=document.querySelector('.hot[data-find='+id+']');if(h){h.classList.add('fixed');}
+    var chipMap={send:'cSend',corner:'cCorner',title:'cTitle',fab:'cFab'};
+    var c=$(chipMap[id]);if(c){c.className='gapchip fixed';c.textContent='✓';}
+    showToast('Edited <b style="color:#86EFAC">src/main</b> + reverted live override · re-diffing on save');
+    setGap(toGap);setFid(toFid);
+  }
+
+  // ---- interactive ----
+  document.querySelectorAll('.hot').forEach(function(h){h.addEventListener('click',function(){if(!h.classList.contains('fixed'))select(h.dataset.find);});});
+  document.querySelectorAll('.find').forEach(function(f){f.querySelector('.fh').addEventListener('click',function(){if(!f.classList.contains('done'))select(f.dataset.find);});});
+  document.querySelectorAll('#tree .row').forEach(function(r){r.addEventListener('click',function(){if(r.dataset.find)select(r.dataset.find);});});
+  document.querySelectorAll('[data-apply]').forEach(function(b){b.addEventListener('click',function(e){e.stopPropagation();applyLive(b.dataset.apply);});});
+  document.querySelectorAll('[data-fix]').forEach(function(b){b.addEventListener('click',function(e){e.stopPropagation();var id=b.dataset.fix;fixCode(id,Math.max(1,gap-2),Math.min(99,fid+2));checkConverged();});});
+  function checkConverged(){if(document.querySelectorAll('.find.done').length>=4){$('accept').classList.add('show');$('mGaps').textContent='0 gaps';$('stLast').textContent='all gaps closed · ready to accept';setQual(95);}}
+
+  var seam=$('seam'),handle=$('handle'),phone=$('phone'),drag=false;
+  function pxToPct(e){var r=phone.getBoundingClientRect();return (e.clientX-r.left)/r.width*100;}
+  function dn(e){drag=true;$('hint').classList.remove('show');e.preventDefault();}
+  handle.addEventListener('mousedown',dn);seam.addEventListener('mousedown',dn);
+  window.addEventListener('mousemove',function(e){if(drag&&mode==='swipe')setSeam(pxToPct(e),true);});
+  window.addEventListener('mouseup',function(){drag=false;});
+  $('onion').addEventListener('input',function(){if(mode==='swipe')setSeam(parseFloat(this.value),true);else $('live').style.opacity=this.value/100;});
+  $('seg').addEventListener('click',function(e){var b=e.target.closest('button');if(!b)return;[].forEach.call(this.children,function(x){x.classList.remove('on');});b.classList.add('on');mode=b.dataset.v;$('live').classList.remove('heat');seam.style.display=handle.style.display=(mode==='swipe')?'block':'none';if(mode==='swipe'){$('live').style.clipPath='inset(0 0 0 '+pct+'%)';$('live').style.opacity=1;}else if(mode==='onion'){$('live').style.clipPath='none';$('live').style.opacity=.5;}else if(mode==='side'){$('live').style.clipPath='none';$('live').style.opacity=1;}else{$('live').style.clipPath='none';$('live').classList.add('heat');}});
+  setInterval(function(){$('recomp').textContent=String(38+Math.floor(Math.random()*18));},900);
+
+  // ---- reset ----
+  function reset(){
+    clearAll();gap=9;fid=91;qual=87;mode='swipe';
+    $('live').className='layer l-live';$('live').style.clipPath='inset(0 0 0 50%)';$('live').style.opacity=1;
+    setSeam(50);$('gapNum').textContent='9%';$('gapRing').style.width='91%';$('gapDelta').textContent='▾ closed 12% this session';
+    $('stFid').textContent='91%';$('stQual').textContent='87%';$('mGaps').textContent='4 gaps';$('stLast').textContent='4 gaps open · on save';
+    $('rSend').style.display='';$('rMeta').textContent='tap a hotspot';
+    clearSel();$('accept').classList.remove('show');$('hint').classList.remove('show');
+    document.querySelectorAll('.hot').forEach(function(h){h.className=h.className.replace(/\s*(sel|dim|fixed)/g,'');});
+    document.querySelectorAll('.find').forEach(function(f){f.classList.remove('done','open','sel');});
+    ['cSend','cCorner','cTitle','cFab'].forEach(function(id,i){var c=$(id);c.className='gapchip '+['bad','bad','warn','miss'][i];c.textContent=['color','corner','font','missing'][i];});
+    setBeat(0);cap('wipe → inspect → apply / fix → the gap closes → accept');
+  }
+
+  // ---- play ----
+  function play(){
+    reset();var T=0;var seq=function(ms,fn){after(T+=ms,fn);};
+    seq(700,function(){setBeat(0);cap('① Mirror: your design vs the running app. 4 gaps, ranked.');$('hint').classList.add('show');});
+    seq(1400,function(){setBeat(1);cap('② Wipe the seam — drifted elements reveal against the live app.');$('hint').classList.remove('show');setSeam(24);});
+    seq(1400,function(){setSeam(72);});
+    seq(900,function(){setSeam(50);setBeat(2);cap('③ Tap the broken send button → its exact code diff. Tap-to-twin.');select('send');});
+    seq(1500,function(){setBeat(3);cap('④ Apply to live — real device repaints in <1s, Gap ticks 9→7.');applyLive('send');});
+    seq(1700,function(){setBeat(4);cap('⑤ Fix in code — writes src/main, finding done, Gap 7→6.');fixCode('send',6,93);});
+    seq(1500,function(){select('corner');});
+    seq(1100,function(){fixCode('corner',4,95);});
+    seq(1300,function(){select('title');});
+    seq(1000,function(){fixCode('title',2,97);});
+    seq(1300,function(){select('fab');});
+    seq(1000,function(){fixCode('fab',1,99);clearSel();});
+    seq(900,function(){setBeat(5);cap('⑥ Gap closed → accept writes the 3 files into your real module.');checkConverged();});
+  }
+
+  window.gotoBeat=function(n){
+    clearAll();reset();setBeat(n);
+    if(n===1){setSeam(24);cap('② Wipe the seam — drift revealed against the live app.');}
+    if(n>=2){setSeam(50);select('send');cap('③ Tap the broken node → exact code diff (tap-to-twin).');}
+    if(n>=3){applyLive('send');cap('④ Apply to live — device repaints <1s, Gap 9→7.');}
+    if(n>=4){fixCode('send',6,93);select('corner');cap('⑤ Fix in code — finding done, Gap ticks down.');}
+    if(n>=5){clearSel();fixCode('corner',4,95);fixCode('title',2,97);fixCode('fab',1,99);checkConverged();cap('⑥ Gap closed → accept into your real module.');}
+  };
+
+  reset();
+  after(700,play);
+})();
+</script>
+</body>
+</html>

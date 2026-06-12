@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Forge — D2C · live inspector · design mockups</title>
+<style>
+:root{--base:#121417;--panel:#181B20;--elev:#1F242B;--b-def:#2C313A;--b-subtle:#21252B;
+ --t-pri:#E6E8EB;--t-sec:#9AA0A6;--t-mut:#6B6F78;--ac:#22C55E;--ac-h:#4ADE80;--ac-br:#86EFAC;--ac-soft:#0E2818;--ac-glow:rgba(74,222,128,.35);
+ --mono:"SF Mono",ui-monospace,Menlo,Consolas,monospace;--sans:-apple-system,"Inter","Segoe UI",Roboto,sans-serif;--ease:cubic-bezier(0.2,0,0,1);}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:radial-gradient(120% 80% at 50% 0%,#16191e,#0c0e11 70%);min-height:100vh;font-family:var(--sans);color:var(--t-pri);-webkit-font-smoothing:antialiased;padding:56px 24px 80px}
+.wrap{max-width:1040px;margin:0 auto}
+.head{display:flex;align-items:center;gap:12px;margin-bottom:6px}
+.glyph{width:34px;height:34px;border-radius:9px;background:linear-gradient(145deg,#22C55E,#16833f);display:flex;align-items:center;justify-content:center;font-weight:700;font-size:19px;color:#06140b;box-shadow:0 0 18px var(--ac-glow)}
+h1{font-size:26px;font-weight:650;letter-spacing:.2px}
+h1 small{color:var(--t-mut);font-weight:400;font-size:14px;margin-left:6px}
+.tag{color:var(--t-sec);font-size:14px;line-height:1.6;margin:14px 0 6px;max-width:760px}
+.tag b{color:var(--ac-br);font-weight:600}
+.one{font-family:var(--mono);font-size:12px;color:var(--t-mut);margin-bottom:34px}
+.one b{color:var(--ac-h)}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:16px}
+a.card{display:block;text-decoration:none;color:inherit;background:var(--panel);border:1px solid var(--b-def);border-radius:12px;overflow:hidden;transition:transform .22s var(--ease),border-color .22s var(--ease),box-shadow .22s var(--ease)}
+a.card:hover{transform:translateY(-3px);border-color:#3a4250;box-shadow:0 18px 50px rgba(0,0,0,.45)}
+.thumb{height:150px;background:#0e1116;border-bottom:1px solid var(--b-subtle);position:relative;overflow:hidden;display:flex;align-items:center;justify-content:center}
+.thumb img{width:100%;height:100%;object-fit:cover;object-position:top}
+.star{position:absolute;top:10px;left:10px;font-size:10px;font-family:var(--mono);color:var(--ac-br);background:var(--ac-soft);border:1px solid #1c3a28;border-radius:999px;padding:3px 8px}
+.cbody{padding:14px 15px 16px}
+.cbody h3{font-size:14px;font-weight:600;margin-bottom:5px;display:flex;align-items:center;gap:8px}
+.cbody p{font-size:12px;color:var(--t-sec);line-height:1.55}
+.cbody .go{margin-top:10px;font-size:11px;font-family:var(--mono);color:var(--ac-h)}
+.ph{width:100%;height:100%;display:flex;align-items:center;justify-content:center;color:var(--t-mut);font-family:var(--mono);font-size:11px}
+.foot{margin-top:38px;font-size:11px;color:var(--t-mut);font-family:var(--mono);border-top:1px solid var(--b-subtle);padding-top:16px;line-height:1.8}
+.foot b{color:var(--t-sec)}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="head"><div class="glyph">F</div><h1>Forge<small>D2C · live inspector · inside Android Studio</small></h1></div>
+  <p class="tag">A live <b>Figma→Android</b> codegen tool fused with the live-device inspector. Generate locally, build against a sample-app sandbox in seconds, and <b>mirror your design against the real running app</b> — then ship the accepted code into your actual module.</p>
+  <p class="one">north star → <b>one number: the Gap</b> between the design you intended and the app actually running on the device in your hand.</p>
+
+  <div class="grid">
+    <a class="card" href="first-run-flow.html">
+      <div class="thumb"><img src="mirror-hero-preview.png" onerror="this.replaceWith(Object.assign(document.createElement('div'),{className:'ph',textContent:'▶ animated flow'}))"><span class="star">★ animated · start here</span></div>
+      <div class="cbody"><h3>First-run → first Mirror</h3><p>The onboarding "whoa" — paste a Figma frame, watch it generate + build in the sandbox, and the design lands on your live app. Autoplays; replay, scrub beats, drag the seam.</p><div class="go">play the flow →</div></div>
+    </a>
+    <a class="card" href="mirror-diff-loop.html">
+      <div class="thumb"><img src="mirror-hero-preview.png" onerror="this.replaceWith(Object.assign(document.createElement('div'),{className:'ph',textContent:'▶ diff loop'}))"><span class="star">★ animated</span></div>
+      <div class="cbody"><h3>Mirror diff loop</h3><p>The hero interaction: wipe the seam → tap a hotspot for the exact code diff → Apply-to-live (device repaints &lt;1s) vs Fix-in-code → watch the Gap close → accept. Autoplays; replay/scrub beats.</p><div class="go">play the loop →</div></div>
+    </a>
+    <a class="card" href="mirror-hero.html">
+      <div class="thumb"><img src="mirror-hero-preview.png" onerror="this.replaceWith(Object.assign(document.createElement('div'),{className:'ph',textContent:'mirror hero'}))"></div>
+      <div class="cbody"><h3>Mirror — the live diff stage (static)</h3><p>The hero surface as a single rich state: design vs running app on one phone with a swipeable seam, the Gap Meter, pinned drift hotspots, and node-level findings with Apply-to-live / Fix-in-code.</p><div class="go">open →</div></div>
+    </a>
+    <a class="card" href="accept-integrate.html">
+      <div class="thumb"><div class="ph">▶ accept → integrate</div><span class="star">★ animated</span></div>
+      <div class="cbody"><h3>Accept → integrate</h3><p>The closer: stage a review (nothing written yet) → per-file diff with live package remap → res-merge collision gate → one atomic PSI write into your REAL module → editor opens, sandbox reverts, Undo rides shotgun. Autoplays.</p><div class="go">play the close →</div></div>
+    </a>
+    <a class="card" href="generate-cockpit.html">
+      <div class="thumb"><img src="cockpit-default.png" onerror="this.replaceWith(Object.assign(document.createElement('div'),{className:'ph',textContent:'▶ generate cockpit'}))"><span class="star">★ animated</span></div>
+      <div class="cbody"><h3>Generate — the steerable cockpit</h3><p>Replaces the web's read-only log: an editable agent plan you steer (not re-prompt), files streaming into the sandbox, and XML/Compose/Native variants racing on live fidelity rings. Autoplays.</p><div class="go">play the cockpit →</div></div>
+    </a>
+  </div>
+
+  <div class="foot">
+    <b>flow:</b> Figma fetch (only external bit) → generate → write to the sandbox module → ./gradlew compile + render locally → similarity/fidelity → mirror on the real device → <b>accept → integrate into your real module</b><br>
+    mockups are static HTML, inline CSS/JS, no external assets · the plugin's Jewel dark tokens · sample data
+  </div>
+</div>
+</body>
+</html>

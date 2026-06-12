@@ -1,0 +1,689 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Forge — Mirror (the live diff stage) · D2C inside Android Studio</title>
+<style>
+/* ============================================================================
+   FORGE · MIRROR HERO — "your design vs your real app, live, in one phone"
+   Tokens map 1:1 to the plugin's Jewel DesignTokens.
+   Deep low-contrast dark canvas. Green is the ONLY saturated pop — reserved for
+   the Gap closing, the seam, the live-device dot, primary actions and 'done'.
+   Built as a fixed 1480×920 Android Studio tool window design artifact.
+   ============================================================================ */
+:root{
+  /* surface */
+  --surface-base:#121417; --surface-panel:#181B20; --surface-elevated:#1F242B;
+  --surface-hover:#1C2128; --surface-selected:#272E36; --surface-input:#0E1013; --surface-code:#0E1116;
+  /* border */
+  --border-subtle:#21252B; --border-default:#2C313A; --border-strong:#444A54;
+  /* text */
+  --text-primary:#E6E8EB; --text-secondary:#9AA0A6; --text-muted:#6B6F78; --text-code:#B8C0CC;
+  /* accent — the inspector green (only saturated pop) */
+  --accent:#22C55E; --accent-hover:#4ADE80; --accent-bright:#86EFAC; --accent-soft:#0E2818; --accent-glow:rgba(74,222,128,.35);
+  /* match (amber) + low-chroma semantics */
+  --match:#E0B24D; --match-soft:#2A2310;
+  --success:#6FAE8C; --warning:#C7A77B; --danger:#CC8585; --info:#88A9C4;
+  --purple:#C49AD0; --purple-soft:#241626;
+  /* spacing / radius / type */
+  --s-half:2px;--s1:4px;--s2:8px;--s3:12px;--s4:16px;--s5:20px;--s6:24px;
+  --r-sm:4px;--r-md:6px;--r-lg:8px;--r-pill:9999px;
+  --font-sans:-apple-system,BlinkMacSystemFont,'Inter','Segoe UI',sans-serif;
+  --font-mono:'JetBrains Mono','SF Mono','TX02-Mono',Menlo,monospace;
+  --t-display:15px;--t-title:13px;--t-body:12px;--t-caption:11px;--t-mono:11px;
+  --fast:120ms cubic-bezier(0.2,0,0,1); --base:220ms cubic-bezier(0.2,0,0,1);
+  --row-sm:26px;--row-md:28px;--row-lg:32px; --header-bar:40px;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%;font-family:var(--font-sans);font-size:var(--t-body);color:var(--text-primary);background:#08090b;-webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility}
+body{display:grid;place-items:center;padding:18px;min-height:100vh}
+button{font:inherit;color:inherit;background:none;border:none;cursor:pointer}
+.mono{font-family:var(--font-mono)}
+::selection{background:rgba(74,222,128,.25)}
+
+/* ============================== ROOT SHELL ============================== */
+.tool-window{
+  width:1480px;height:920px;display:grid;grid-template-rows:var(--header-bar) 28px 1fr 26px;
+  overflow:hidden;background:var(--surface-base);
+  border:1px solid var(--border-default);border-radius:var(--r-lg);
+  box-shadow:0 40px 120px rgba(0,0,0,.7),0 0 0 1px rgba(0,0,0,.4);
+}
+
+/* ---- Toolbar (40dp) ---- */
+.toolbar{display:flex;align-items:center;gap:var(--s2);padding:0 var(--s3);background:var(--surface-panel);border-bottom:1px solid var(--border-subtle)}
+.brand{display:flex;align-items:center;gap:var(--s2);font-size:var(--t-display);font-weight:600;letter-spacing:-.01em}
+.brand .glyph{width:18px;height:18px;border-radius:5px;background:linear-gradient(135deg,var(--accent),var(--accent-hover));display:grid;place-items:center;color:#06140b;font-weight:800;font-size:11px;box-shadow:0 0 12px var(--accent-glow)}
+.brand .sub{color:var(--text-muted);font-weight:400;font-size:var(--t-caption)}
+.tb-div{width:1px;height:18px;background:var(--border-subtle);margin:0 var(--s1)}
+.tb-group{display:flex;align-items:center;gap:2px}
+.icon-btn{width:28px;height:28px;border-radius:var(--r-md);display:inline-flex;align-items:center;justify-content:center;color:var(--text-secondary);transition:background var(--fast),color var(--fast)}
+.icon-btn:hover{background:var(--surface-hover);color:var(--text-primary)}
+.icon-btn.active{background:var(--accent-soft);color:var(--accent-hover)}
+.icon-btn svg{width:16px;height:16px;stroke-width:1.7}
+.spacer{flex:1}
+.pill{display:inline-flex;align-items:center;gap:var(--s2);padding:4px var(--s3);background:var(--surface-elevated);border:1px solid var(--border-subtle);border-radius:var(--r-pill);font-size:var(--t-caption);color:var(--text-secondary);transition:background var(--fast)}
+.pill:hover{background:var(--surface-hover)}
+.pill .dot{width:6px;height:6px;border-radius:50%;background:var(--accent);box-shadow:0 0 0 0 var(--accent-glow);animation:pulse 2.2s cubic-bezier(.4,0,.6,1) infinite}
+.pill.amber{cursor:default}
+.pill.amber .dot{background:var(--match);animation:none}
+@keyframes pulse{0%,100%{box-shadow:0 0 0 0 var(--accent-glow)}50%{box-shadow:0 0 0 5px rgba(74,222,128,0)}}
+.sidecar{font-size:9px;font-family:var(--font-mono);color:var(--text-muted);border:1px solid var(--border-subtle);border-radius:var(--r-pill);padding:3px 9px;white-space:nowrap}
+.sidecar b{color:var(--text-secondary);font-weight:500}
+
+/* ---- Mode strip (Generate · Mirror · Eval) ---- */
+.mode-strip{display:flex;align-items:stretch;background:var(--surface-panel);border-bottom:1px solid var(--border-subtle);padding:0 var(--s3);gap:var(--s4)}
+.mode{position:relative;display:flex;align-items:center;gap:var(--s2);font-size:var(--t-title);color:var(--text-secondary);cursor:pointer;padding:0 var(--s1);transition:color var(--fast)}
+.mode:hover{color:var(--text-primary)}
+.mode .badge{font-size:9px;padding:1px 5px;border-radius:var(--r-pill);background:var(--surface-elevated);color:var(--text-muted);border:1px solid var(--border-subtle)}
+.mode.on{color:var(--text-primary)}
+.mode.on .badge{background:var(--accent-soft);color:var(--accent-bright);border-color:transparent}
+.mode .under{position:absolute;left:0;right:0;bottom:-1px;height:2px;background:var(--accent);border-radius:2px;transform:scaleX(0);transition:transform var(--base);transform-origin:center}
+.mode.on .under{transform:scaleX(1)}
+.mode-strip .gapnote{margin-left:auto;display:flex;align-items:center;gap:var(--s2);font-size:var(--t-caption);color:var(--text-muted)}
+.mode-strip .gapnote b{color:var(--text-secondary);font-weight:500}
+.mode-strip .gapnote .autodiff{display:inline-flex;align-items:center;gap:5px;color:var(--accent)}
+.mode-strip .gapnote .autodiff .d{width:5px;height:5px;border-radius:50%;background:var(--accent);box-shadow:0 0 6px var(--accent-glow)}
+
+/* ============================== MAIN GRID ============================== */
+.main{display:grid;grid-template-columns:248px 1.35fr 320px;min-height:0;background:var(--border-subtle);gap:1px}
+.pane{background:var(--surface-base);min-height:0;display:flex;flex-direction:column;overflow:hidden}
+.pane-head{height:var(--header-bar);min-height:var(--header-bar);display:flex;align-items:center;gap:var(--s2);padding:0 var(--s3);border-bottom:1px solid var(--border-subtle);background:var(--surface-panel)}
+.pane-head h2{font-size:var(--t-title);font-weight:500}
+.pane-head .meta{margin-left:auto;font-size:var(--t-caption);color:var(--text-muted);font-family:var(--font-mono)}
+.scroll{overflow:auto;flex:1;min-height:0}
+.scroll::-webkit-scrollbar{width:10px;height:10px}
+.scroll::-webkit-scrollbar-thumb{background:var(--border-default);border-radius:6px;border:3px solid var(--surface-base)}
+.scroll::-webkit-scrollbar-thumb:hover{background:var(--border-strong)}
+
+/* ---- LEFT: merged design ⇄ live hierarchy (Twin spine) ---- */
+.tree{padding:var(--s2) var(--s1)}
+.tree-legend{display:flex;flex-wrap:wrap;gap:var(--s2) var(--s3);padding:var(--s2) var(--s3);font-size:9px;color:var(--text-muted);border-bottom:1px solid var(--border-subtle)}
+.tree-legend span{display:inline-flex;align-items:center}
+.tree-legend i{display:inline-block;width:8px;height:8px;border-radius:2px;margin-right:4px}
+.node{display:flex;align-items:center;gap:6px;height:var(--row-sm);padding:0 var(--s2);border-radius:var(--r-sm);cursor:pointer;font-size:var(--t-body);color:var(--text-secondary);position:relative;transition:background var(--fast)}
+.node:hover{background:var(--surface-hover)}
+.node.sel{background:var(--surface-selected);color:var(--text-primary)}
+.node.sel::before{content:"";position:absolute;left:0;top:3px;bottom:3px;width:2px;border-radius:2px;background:var(--accent);box-shadow:0 0 8px var(--accent-glow)}
+.node .tw{width:12px;color:var(--text-muted);font-size:9px;text-align:center;flex:none}
+.node .nm{flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.node .nm b{color:var(--text-primary);font-weight:500}
+.node.ghost .nm{font-style:italic;color:var(--text-muted)}
+.node .gapchip{font-size:9px;font-family:var(--font-mono);padding:0 5px;border-radius:var(--r-pill);height:14px;display:inline-flex;align-items:center;flex:none}
+.gap-ok{background:var(--accent-soft);color:var(--accent-bright)}
+.gap-warn{background:var(--match-soft);color:var(--match)}
+.gap-bad{background:#2A1414;color:var(--danger)}
+.gap-missing{background:var(--purple-soft);color:var(--purple)}
+.indent-1{padding-left:18px}.indent-2{padding-left:34px}.indent-3{padding-left:50px}.indent-4{padding-left:66px}
+.node .recomp{font-size:8px;color:var(--match);font-family:var(--font-mono);opacity:.9;flex:none}
+.tree-foot{padding:var(--s2) var(--s3);border-top:1px solid var(--border-subtle);font-size:9px;color:var(--text-muted);font-family:var(--font-mono);display:flex;gap:var(--s3);flex-wrap:wrap}
+.tree-foot b{color:var(--text-secondary)}
+
+/* ---- CENTER: the Mirror stage ---- */
+.stage-head{height:var(--header-bar);min-height:var(--header-bar);display:flex;align-items:center;gap:var(--s2);padding:0 var(--s3);border-bottom:1px solid var(--border-subtle);background:var(--surface-panel)}
+.seg{display:inline-flex;background:var(--surface-input);border:1px solid var(--border-subtle);border-radius:var(--r-md);overflow:hidden}
+.seg button{padding:4px var(--s3);font-size:var(--t-caption);color:var(--text-secondary);transition:background var(--fast),color var(--fast)}
+.seg button.on{background:var(--surface-elevated);color:var(--text-primary)}
+.seg button:hover:not(.on){color:var(--text-primary)}
+.stage-head .meta{margin-left:auto;font-size:var(--t-caption);color:var(--text-muted);font-family:var(--font-mono)}
+
+.stage{flex:1;position:relative;display:grid;place-items:center;padding:var(--s5);min-height:0;overflow:hidden;background:
+  radial-gradient(120% 80% at 50% 0%, #15181d 0%, var(--surface-base) 70%)}
+
+/* phone frame holds the two superimposed layers */
+.phone{position:relative;width:280px;height:600px;border-radius:26px;background:#05070a;border:1px solid var(--border-strong);box-shadow:0 18px 60px rgba(0,0,0,.6), 0 0 0 6px #0a0c0f;overflow:hidden}
+.phone .notch{position:absolute;top:7px;left:50%;transform:translateX(-50%);width:78px;height:16px;border-radius:10px;background:#05070a;z-index:40}
+.layer{position:absolute;inset:0;overflow:hidden}
+.l-design{background:linear-gradient(180deg,#101319,#0c0e13)}
+.l-live{background:linear-gradient(180deg,#0f1217,#0b0d12);clip-path:inset(0 0 0 50%);transition:opacity var(--base)}
+
+/* swipe handle — the product's logo-in-motion */
+.swipe{position:absolute;top:0;bottom:0;left:50%;width:2px;background:var(--accent);box-shadow:0 0 14px var(--accent-glow);z-index:50;cursor:ew-resize}
+.swipe::before{content:"";position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:26px;height:26px;border-radius:50%;background:var(--accent);box-shadow:0 0 16px var(--accent-glow),0 2px 6px rgba(0,0,0,.4)}
+.swipe::after{content:"⇄";position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);color:#06140b;font-size:12px;font-weight:800}
+.swipe .tagL,.swipe .tagR{position:absolute;top:14px;font-size:9px;font-weight:700;letter-spacing:.08em;padding:2px 6px;border-radius:var(--r-pill);font-family:var(--font-mono);white-space:nowrap}
+.swipe .tagL{right:8px;background:rgba(8,20,11,.85);color:var(--accent-bright);border:1px solid var(--accent-soft)}
+.swipe .tagR{left:8px;background:rgba(20,16,8,.85);color:var(--match);border:1px solid var(--match-soft)}
+
+/* the screen contents (shared scaffold; live variant overrides drifts) */
+.scr{position:absolute;inset:0;padding:30px 14px 14px;color:#cdd3da;font-size:9px}
+.appbar{display:flex;align-items:center;gap:8px;height:34px;border-bottom:1px solid rgba(255,255,255,.05);margin:-4px -4px 10px;padding:0 4px}
+.appbar .av{width:24px;height:24px;border-radius:50%;background:linear-gradient(135deg,#2f3a48,#222a33);flex:none}
+.appbar .ttl{font-weight:700;font-size:11px;color:#e6e8eb;transition:font-size var(--base)}
+.appbar .ic{margin-left:auto;width:18px;height:18px;border-radius:5px;background:#222a33;flex:none}
+.bubble{max-width:76%;padding:8px 10px;border-radius:14px;margin:0 0 9px;line-height:1.35}
+.b-them{background:#1b222b;border-radius:14px 14px 14px 4px}
+.b-me{background:var(--accent-soft);color:var(--accent-bright);margin-left:auto;border-radius:14px 14px 4px 14px;transition:border-radius var(--base)}
+.composer{position:absolute;left:14px;right:14px;bottom:14px;height:36px;border-radius:18px;background:#11161c;border:1px solid rgba(255,255,255,.07);display:flex;align-items:center;padding:0 12px;color:#6b6f78}
+.composer .send{margin-left:auto;width:26px;height:26px;border-radius:50%;background:var(--accent);box-shadow:0 0 10px var(--accent-glow);flex:none;transition:background var(--base),box-shadow var(--base)}
+/* the design-only scroll FAB (purple ghost — missing in live) */
+.fab{position:absolute;right:14px;bottom:60px;width:30px;height:30px;border-radius:50%;background:#162a1e;border:1px solid var(--accent-soft);display:grid;place-items:center;color:var(--accent-bright);font-size:12px}
+/* LIVE drift overrides — visibly "wrong" vs design */
+.l-live .bubble.b-them{background:#212a34}
+.l-live .b-me{background:#123222;border-radius:8px}            /* corner radius drift 14→8 */
+.l-live .appbar .ttl{font-size:13px}                          /* font-size drift 11→13 */
+.l-live .composer .send{background:#2a3a30;box-shadow:none}    /* color drift / unbound */
+.l-live .fab{display:none}                                     /* missing in live */
+
+/* diff hotspots — drawn over BOTH layers, pinned to drifted regions */
+.hot{position:absolute;border-radius:6px;z-index:60;cursor:pointer;pointer-events:auto;transition:box-shadow var(--fast),opacity var(--base)}
+.hot::after{content:attr(data-k);position:absolute;top:-9px;left:-1px;font-size:8px;font-family:var(--font-mono);padding:1px 5px;border-radius:var(--r-pill);font-weight:700}
+.hot.amber{border:1.5px dashed var(--match);box-shadow:0 0 0 3px var(--match-soft)}
+.hot.amber::after{background:var(--match);color:#1a1408}
+.hot.red{border:1.5px dashed var(--danger);box-shadow:0 0 0 3px #2A1414}
+.hot.red::after{background:var(--danger);color:#1a0808}
+.hot.purple{border:1.5px dashed var(--purple);box-shadow:0 0 0 3px var(--purple-soft)}
+.hot.purple::after{background:var(--purple);color:#1c0f22}
+.hot:hover{box-shadow:0 0 0 4px var(--accent-glow)}
+.hot.sel{box-shadow:0 0 0 3px var(--accent),0 0 18px var(--accent-glow)}
+.hot.dim{opacity:.25}
+.hot.resolved{opacity:0;transform:scale(.85);pointer-events:none}
+.hotspots-off .hot{opacity:0;pointer-events:none}
+
+/* GAP METER — the always-on number, frosted HUD */
+.gapmeter{position:absolute;top:var(--s4);left:var(--s4);background:rgba(10,12,15,.7);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);border:1px solid var(--border-default);border-radius:var(--r-lg);padding:var(--s3) var(--s4);min-width:154px;z-index:70;box-shadow:0 8px 30px rgba(0,0,0,.4)}
+.gapmeter .lbl{font-size:9px;letter-spacing:.1em;color:var(--text-muted);text-transform:uppercase}
+.gapmeter .big{font-size:34px;font-weight:700;line-height:1;letter-spacing:-.03em;color:var(--accent-bright);font-family:var(--font-mono);margin-top:2px}
+.gapmeter .big small{font-size:14px;color:var(--text-muted)}
+.gapmeter .delta{font-size:var(--t-caption);color:var(--accent);margin-top:3px}
+.gapmeter .ring{margin-top:var(--s2);height:4px;border-radius:2px;background:var(--surface-elevated);overflow:hidden}
+.gapmeter .ring>i{display:block;height:100%;width:91%;background:linear-gradient(90deg,var(--accent),var(--accent-hover));transition:width var(--base)}
+.sparkline{margin-top:var(--s2);display:flex;align-items:flex-end;gap:2px;height:22px}
+.sparkline i{width:5px;background:var(--accent-soft);border-radius:1px}
+.sparkline i.now{background:var(--accent)}
+
+/* live recomposition heat ping in stage corner */
+.heatping{position:absolute;top:var(--s4);right:var(--s4);background:rgba(10,12,15,.7);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);border:1px solid var(--border-default);border-radius:var(--r-lg);padding:var(--s2) var(--s3);font-size:var(--t-caption);color:var(--text-secondary);display:flex;align-items:center;gap:var(--s2);z-index:70;box-shadow:0 8px 30px rgba(0,0,0,.4)}
+.heatping .hz{font-family:var(--font-mono);color:var(--match);min-width:34px}
+.heatping .pulse{width:7px;height:7px;border-radius:50%;background:var(--match);animation:pulse2 1s infinite}
+@keyframes pulse2{0%,100%{opacity:.4}50%{opacity:1}}
+
+/* stage footer — scrubber / onion controls */
+.stage-foot{display:flex;align-items:center;gap:var(--s3);padding:var(--s2) var(--s4);border-top:1px solid var(--border-subtle);background:var(--surface-panel)}
+.onion{flex:1;display:flex;align-items:center;gap:var(--s2)}
+.onion input[type=range]{flex:1;accent-color:var(--accent);height:3px}
+.onion .cap{font-size:9px;color:var(--text-muted);font-family:var(--font-mono);width:54px;text-align:center}
+.chip-btn{font-size:var(--t-caption);color:var(--text-secondary);padding:4px var(--s3);border:1px solid var(--border-default);border-radius:var(--r-md);transition:all var(--fast)}
+.chip-btn:hover{border-color:var(--border-strong);color:var(--text-primary)}
+.chip-btn.on{background:var(--accent-soft);color:var(--accent-bright);border-color:transparent}
+
+/* ---- RIGHT: gap inspector / fix rail ---- */
+.gaprail{padding:var(--s3)}
+.gaprail h3{font-size:9px;letter-spacing:.1em;text-transform:uppercase;color:var(--text-muted);margin:var(--s3) 0 var(--s2);display:flex;align-items:center;gap:6px}
+.gaprail h3 .ct{margin-left:auto;font-family:var(--font-mono);color:var(--text-secondary);letter-spacing:0;text-transform:none}
+
+/* generate card (top of rail) */
+.gencard{background:var(--surface-panel);border:1px solid var(--border-default);border-radius:var(--r-lg);padding:var(--s3);margin-bottom:var(--s2)}
+.gencard .fig{display:flex;align-items:center;gap:var(--s2);font-size:var(--t-caption);color:var(--text-secondary);background:var(--surface-input);border:1px solid var(--border-subtle);border-radius:var(--r-md);padding:5px var(--s2);margin-bottom:var(--s2)}
+.gencard .fig .lk{flex:1;color:var(--text-code);font-family:var(--font-mono);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.gencard .fig .icon-btn{width:22px;height:22px}
+.gencard .fig .icon-btn svg{width:13px;height:13px}
+.gencard .row{display:flex;gap:var(--s2);margin-bottom:var(--s2)}
+.select{flex:1;font-size:var(--t-caption);color:var(--text-secondary);background:var(--surface-input);border:1px solid var(--border-subtle);border-radius:var(--r-md);padding:5px var(--s2);display:flex;align-items:center;justify-content:space-between;cursor:pointer;transition:border-color var(--fast)}
+.select:hover{border-color:var(--border-default)}
+.gencard .actions{display:flex;gap:var(--s2)}
+
+/* pipeline ticker (replaces the web log dump) */
+.ticker{display:flex;align-items:center;gap:6px;font-size:9px;color:var(--text-muted);margin-top:var(--s2);flex-wrap:wrap}
+.ticker .step{display:flex;align-items:center;gap:4px;white-space:nowrap}
+.ticker .step .d{width:5px;height:5px;border-radius:50%;background:var(--border-strong)}
+.ticker .step.done .d{background:var(--accent)}
+.ticker .step.active{color:var(--accent-bright)}
+.ticker .step.active .d{background:var(--accent);box-shadow:0 0 8px var(--accent-glow);animation:pulse2 1s infinite}
+
+/* findings */
+.finding{border:1px solid var(--border-default);border-radius:var(--r-md);background:var(--surface-panel);margin-bottom:var(--s2);overflow:hidden;transition:border-color var(--fast),box-shadow var(--fast)}
+.finding:hover{border-color:var(--border-strong)}
+.finding.sel{border-color:var(--accent);box-shadow:0 0 0 1px var(--accent),0 0 16px var(--accent-glow)}
+.finding.done{opacity:.6;border-color:var(--border-subtle)}
+.finding .top{display:flex;align-items:center;gap:var(--s2);padding:var(--s2) var(--s3);cursor:pointer}
+.finding .rank{font-size:8px;font-family:var(--font-mono);color:var(--text-muted);width:11px;flex:none}
+.finding .sev{width:8px;height:8px;border-radius:2px;flex:none}
+.sev-amber{background:var(--match)}.sev-red{background:var(--danger)}.sev-purple{background:var(--purple)}
+.finding .ttl{font-size:var(--t-body);color:var(--text-primary);font-weight:500;flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.finding.done .ttl{text-decoration:line-through;color:var(--text-muted)}
+.finding .loc{margin-left:auto;font-size:9px;color:var(--text-muted);font-family:var(--font-mono);flex:none}
+.finding .donetag{font-size:9px;font-family:var(--font-mono);color:var(--accent);display:none}
+.finding.done .donetag{display:inline}
+.finding.done .loc{display:none}
+.finding .body{padding:0 var(--s3) var(--s3);display:none}
+.finding.open .body{display:block;animation:slideIn var(--base)}
+@keyframes slideIn{from{opacity:0;transform:translateY(-4px)}to{opacity:1;transform:none}}
+.kv{display:grid;grid-template-columns:62px 1fr;gap:4px var(--s2);font-size:var(--t-caption);margin:var(--s2) 0;font-family:var(--font-mono)}
+.kv .k{color:var(--text-muted)}
+.kv .exp{color:var(--accent-bright)}
+.kv .act{color:var(--danger)}
+.codeline{background:var(--surface-code);border:1px solid var(--border-subtle);border-radius:var(--r-sm);padding:6px var(--s2);font-family:var(--font-mono);font-size:var(--t-mono);color:var(--text-code);margin:var(--s2) 0;overflow-x:auto;line-height:1.55}
+.codeline .ln{white-space:pre;display:block}
+.codeline .del{color:var(--danger);background:rgba(204,133,133,.08);border-radius:2px}
+.codeline .add{color:var(--accent-bright);background:rgba(34,197,94,.10);border-radius:2px}
+.codeline .file{display:block;font-size:9px;color:var(--text-muted);margin-bottom:4px;padding-bottom:4px;border-bottom:1px solid var(--border-subtle)}
+.actions{display:flex;gap:var(--s2);margin-top:var(--s2);flex-wrap:wrap}
+.btn{font-size:var(--t-caption);padding:5px var(--s3);border-radius:var(--r-md);border:1px solid var(--border-default);color:var(--text-secondary);transition:all var(--fast);display:inline-flex;align-items:center;gap:5px}
+.btn:hover{border-color:var(--border-strong);color:var(--text-primary)}
+.btn svg{width:12px;height:12px;stroke-width:2}
+.btn-primary{background:var(--accent);color:#06140b;border-color:transparent;font-weight:600}
+.btn-primary:hover{background:var(--accent-hover);color:#06140b;box-shadow:0 0 12px var(--accent-glow)}
+.btn-ghost{background:var(--surface-elevated)}
+.alignnote{font-size:9px;color:var(--match);font-family:var(--font-mono);padding:var(--s1) var(--s2);border-top:1px solid var(--match-soft);margin-top:var(--s2)}
+
+/* run history strip at rail bottom */
+.histcard{background:var(--surface-panel);border:1px solid var(--border-default);border-radius:var(--r-lg);padding:var(--s3);margin-top:var(--s3)}
+.histrow{display:flex;align-items:center;gap:var(--s2);padding:var(--s1) 0;font-size:var(--t-caption);color:var(--text-secondary);cursor:pointer;border-radius:var(--r-sm);transition:background var(--fast)}
+.histrow:hover{background:var(--surface-hover)}
+.histrow .v{font-family:var(--font-mono);font-size:9px;color:var(--text-muted)}
+.histrow .sb{margin-left:auto;display:flex;align-items:flex-end;gap:1px;height:14px}
+.histrow .sb i{width:3px;background:var(--accent-soft);border-radius:1px}
+.histrow .sb i.cur{background:var(--accent)}
+.histrow .pct{font-family:var(--font-mono);font-size:9px;color:var(--accent-bright);width:30px;text-align:right}
+
+/* ---- STATUS BAR (26px) ---- */
+.statusbar{display:flex;align-items:center;gap:var(--s3);padding:0 var(--s3);background:var(--surface-panel);border-top:1px solid var(--border-subtle);font-size:var(--t-caption);color:var(--text-muted)}
+.statusbar .seg2{display:flex;align-items:center;gap:6px}
+.statusbar .ok{color:var(--success)}
+.statusbar .spacer{flex:1}
+.statusbar b{color:var(--accent-bright);font-family:var(--font-mono);font-weight:600}
+.statusbar .div{width:1px;height:12px;background:var(--border-subtle)}
+
+/* tiny toast */
+.toast{position:fixed;bottom:42px;left:50%;transform:translateX(-50%) translateY(20px);opacity:0;pointer-events:none;background:var(--surface-elevated);border:1px solid var(--accent);box-shadow:0 8px 30px rgba(0,0,0,.5),0 0 20px var(--accent-glow);border-radius:var(--r-lg);padding:var(--s3) var(--s4);font-size:var(--t-body);color:var(--text-primary);transition:all var(--base);z-index:200;display:flex;align-items:center;gap:var(--s2);max-width:520px}
+.toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+.toast .ic{width:18px;height:18px;border-radius:50%;background:var(--accent);color:#06140b;display:grid;place-items:center;font-weight:800;font-size:11px;flex:none}
+</style>
+</head>
+<body>
+<div class="tool-window">
+
+  <!-- ================= TOOLBAR (40dp) ================= -->
+  <div class="toolbar">
+    <div class="brand"><span class="glyph">F</span> Forge <span class="sub">· D2C · live inspector</span></div>
+    <div class="tb-div"></div>
+    <div class="tb-group">
+      <button class="icon-btn active" title="Refresh live capture"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M20 11A8 8 0 1 0 12 20"/><path d="M20 4v7h-7"/></svg></button>
+      <button class="icon-btn" title="Pin diff"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M12 17v5"/><path d="M5 8l7-5 7 5-2 9H7L5 8z"/></svg></button>
+      <button class="icon-btn" title="Apply to live"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M13 2L3 14h7l-1 8 10-12h-7l1-8z"/></svg></button>
+    </div>
+    <div class="spacer"></div>
+    <button class="icon-btn" title="History"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg></button>
+    <button class="icon-btn" title="Batch queue"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><rect x="3" y="4" width="18" height="4" rx="1"/><rect x="3" y="10" width="18" height="4" rx="1"/><rect x="3" y="16" width="18" height="4" rx="1"/></svg></button>
+    <button class="icon-btn" title="Settings"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="12" cy="12" r="3"/><path d="M19 12a7 7 0 0 0-.1-1l2-1.6-2-3.4-2.4 1a7 7 0 0 0-1.7-1l-.4-2.5h-4l-.4 2.5a7 7 0 0 0-1.7 1l-2.4-1-2 3.4 2 1.6a7 7 0 0 0 0 2l-2 1.6 2 3.4 2.4-1a7 7 0 0 0 1.7 1l.4 2.5h4l.4-2.5a7 7 0 0 0 1.7-1l2.4 1 2-3.4-2-1.6c.1-.3.1-.7.1-1z"/></svg></button>
+    <div class="tb-div"></div>
+    <span class="sidecar"><b>d2c-engine</b> ⇆ stdio · live view-tree bridge</span>
+    <span class="pill amber" title="RecompositionStore.recompsPerSec"><span class="dot"></span> <span class="mono" id="tbHz">49</span> rec/s</span>
+    <span class="pill"><span class="dot"></span> Pixel 8 · API 34 · live</span>
+  </div>
+
+  <!-- ================= MODE STRIP (28px) ================= -->
+  <div class="mode-strip">
+    <div class="mode" onclick="setMode(this)"><span>Generate</span><span class="badge">4/6</span><div class="under"></div></div>
+    <div class="mode on" onclick="setMode(this)"><span>Mirror</span><span class="badge">7 gaps</span><div class="under"></div></div>
+    <div class="mode" onclick="setMode(this)"><span>Eval &amp; History</span><span class="badge">7 runs</span><div class="under"></div></div>
+    <div class="gapnote">screen: <b>ChatThreadScreen</b> · <span class="autodiff"><span class="d"></span>auto-diff on save</span></div>
+  </div>
+
+  <!-- ================= MAIN ================= -->
+  <div class="main">
+
+    <!-- LEFT: merged design ⇄ live hierarchy (Twin spine) -->
+    <div class="pane">
+      <div class="pane-head"><h2>Hierarchy</h2><span class="meta">design ⇄ live</span></div>
+      <div class="tree-legend">
+        <span><i class="gap-ok"></i>matched</span>
+        <span><i class="gap-warn"></i>drift</span>
+        <span><i class="gap-bad"></i>broken</span>
+        <span><i class="gap-missing"></i>missing</span>
+      </div>
+      <div class="scroll"><div class="tree" id="tree">
+        <div class="node" data-k="root" onclick="selectNode('root',null)"><span class="tw">▾</span><span class="nm"><b>ChatThreadScreen</b></span><span class="gapchip gap-ok mono">91%</span></div>
+        <div class="node indent-1" data-k="appbar" onclick="selectNode('appbar',null)"><span class="tw">▾</span><span class="nm">TopAppBar</span><span class="gapchip gap-warn mono">82%</span></div>
+        <div class="node indent-2" data-k="title" onclick="selectNode('title','f_font')"><span class="tw">·</span><span class="nm">Text "Aria Chen"</span><span class="gapchip gap-warn mono">font</span></div>
+        <div class="node indent-2" data-k="avatar" onclick="selectNode('avatar',null)"><span class="tw">·</span><span class="nm">Image avatar</span><span class="gapchip gap-ok mono">ok</span></div>
+        <div class="node indent-1" data-k="list" onclick="selectNode('list',null)"><span class="tw">▾</span><span class="nm">LazyColumn messages</span><span class="gapchip gap-ok mono">94%</span><span class="recomp">↻42/s</span></div>
+        <div class="node indent-2" data-k="bThem" onclick="selectNode('bThem',null)"><span class="tw">·</span><span class="nm">Bubble (them)</span><span class="gapchip gap-ok mono">96%</span></div>
+        <div class="node indent-2 sel" data-k="bMe" onclick="selectNode('bMe','f_corner')"><span class="tw">·</span><span class="nm"><b>Bubble (me)</b></span><span class="gapchip gap-bad mono">corner</span></div>
+        <div class="node indent-1" data-k="composer" onclick="selectNode('composer',null)"><span class="tw">▾</span><span class="nm">Composer Row</span><span class="gapchip gap-warn mono">79%</span></div>
+        <div class="node indent-2" data-k="input" onclick="selectNode('input',null)"><span class="tw">·</span><span class="nm">TextField</span><span class="gapchip gap-ok mono">ok</span></div>
+        <div class="node indent-2" data-k="send" onclick="selectNode('send','f_send')"><span class="tw">·</span><span class="nm">SendButton</span><span class="gapchip gap-bad mono">color</span><span class="recomp">↻7/s</span></div>
+        <div class="node indent-1 ghost" data-k="fab" onclick="selectNode('fab','f_fab')"><span class="tw">◌</span><span class="nm">ScrollToBottom FAB</span><span class="gapchip gap-missing mono">missing</span></div>
+      </div></div>
+      <div class="tree-foot"><span>matched <b>9</b></span><span>drift <b>2</b></span><span>broken <b>2</b></span><span>ghost <b>1</b></span></div>
+    </div>
+
+    <!-- CENTER: the Mirror stage -->
+    <div class="pane">
+      <div class="stage-head">
+        <div class="seg" id="viewseg">
+          <button class="on" onclick="setView(this,'swipe')">Swipe</button>
+          <button onclick="setView(this,'onion')">Onion</button>
+          <button onclick="setView(this,'side')">Side-by-side</button>
+          <button onclick="setView(this,'heat')">Diff heat</button>
+        </div>
+        <span class="meta" id="stagemeta">1080×2400 px · density 420dpi · status/nav cropped</span>
+      </div>
+
+      <div class="stage">
+        <!-- GAP METER -->
+        <div class="gapmeter">
+          <div class="lbl">Mirror Gap</div>
+          <div class="big" id="gapnum">9<small>%</small></div>
+          <div class="delta">▾ closed 12% this session</div>
+          <div class="ring"><i id="gapring"></i></div>
+          <div class="sparkline">
+            <i style="height:40%"></i><i style="height:55%"></i><i style="height:48%"></i><i style="height:70%"></i><i style="height:62%"></i><i style="height:80%"></i><i class="now" style="height:91%"></i>
+          </div>
+        </div>
+
+        <!-- recomposition heat ping (from the inspector RecompositionStore) -->
+        <div class="heatping"><span class="pulse"></span> live recompose <span class="hz" id="hz">49</span> / s</div>
+
+        <!-- THE PHONE: two superimposed layers + swipe -->
+        <div class="phone" id="phone">
+          <div class="notch"></div>
+
+          <!-- DESIGN layer (figma-derived render) -->
+          <div class="layer l-design">
+            <div class="scr">
+              <div class="appbar"><div class="av"></div><div class="ttl">Aria Chen</div><div class="ic"></div></div>
+              <div class="bubble b-them">Hey! did the build go through?</div>
+              <div class="bubble b-me">yep — shipping the mirror demo 🚀</div>
+              <div class="bubble b-them">love it. send a screenshot?</div>
+              <div class="fab">↓</div>
+              <div class="composer">Message…<div class="send"></div></div>
+            </div>
+          </div>
+
+          <!-- LIVE layer (real running app, with drifts) -->
+          <div class="layer l-live" id="liveLayer">
+            <div class="scr">
+              <div class="appbar"><div class="av"></div><div class="ttl">Aria Chen</div><div class="ic"></div></div>
+              <div class="bubble b-them">Hey! did the build go through?</div>
+              <div class="bubble b-me">yep — shipping the mirror demo 🚀</div>
+              <div class="bubble b-them">love it. send a screenshot?</div>
+              <div class="fab">↓</div>
+              <div class="composer">Message…<div class="send" id="liveSend"></div></div>
+            </div>
+          </div>
+
+          <!-- swipe divider -->
+          <div class="swipe" id="swipe" style="left:50%">
+            <span class="tagL">DESIGN</span><span class="tagR">LIVE APP</span>
+          </div>
+
+          <!-- diff hotspots, pinned to drifted regions -->
+          <div class="hotwrap" id="hotwrap">
+            <div class="hot amber" data-k="A" style="top:30px;left:46px;width:120px;height:20px" onclick="selectFinding('f_font',this,event)" title="title font size"></div>
+            <div class="hot red"   data-k="B" style="top:120px;left:60px;width:130px;height:34px" onclick="selectFinding('f_corner',this,event)" title="me-bubble corner radius"></div>
+            <div class="hot red"   data-k="C" style="bottom:18px;right:18px;width:30px;height:30px" onclick="selectFinding('f_send',this,event)" title="send button color/unbound"></div>
+            <div class="hot purple" data-k="D" style="bottom:60px;right:18px;width:34px;height:34px;border-style:dotted" onclick="selectFinding('f_fab',this,event)" title="missing FAB"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- stage footer: onion + scrub -->
+      <div class="stage-foot">
+        <button class="chip-btn on" onclick="toggleChip(this,'hotspots')">Hotspots</button>
+        <button class="chip-btn" onclick="toggleChip(this,'bounds')">Bounds</button>
+        <button class="chip-btn" onclick="toggleChip(this,'recompose')">Recompose heat</button>
+        <div class="onion">
+          <span class="cap">DESIGN</span>
+          <input type="range" min="0" max="100" value="50" id="onionRange" oninput="onSwipe(this.value)">
+          <span class="cap">LIVE</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- RIGHT: gap inspector / fix rail -->
+    <div class="pane">
+      <div class="pane-head"><h2 id="railhead">Gap Inspector</h2><span class="meta">tap a hotspot</span></div>
+      <div class="scroll"><div class="gaprail">
+
+        <!-- generate card -->
+        <div class="gencard">
+          <div class="fig"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor"><circle cx="12" cy="12" r="3"/><path d="M12 2v4M12 18v4M2 12h4M18 12h4"/></svg><span class="lk">figma.com/design/8xK…/Chat?node-id=421-12</span><button class="icon-btn" title="preview frame"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor"><circle cx="11" cy="11" r="7"/><path d="m21 21-4-4"/></svg></button></div>
+          <div class="row">
+            <div class="select">Material 3 <span style="color:var(--text-muted)">▾</span></div>
+            <div class="select">Compose <span style="color:var(--text-muted)">▾</span></div>
+          </div>
+          <div class="actions">
+            <button class="btn btn-primary" style="flex:1;justify-content:center" onclick="regen()">Generate → write to module</button>
+            <button class="btn btn-ghost" title="fast structure-only path (skips LLM)">Fast</button>
+          </div>
+          <div class="ticker" id="ticker">
+            <span class="step done"><span class="d"></span>semi</span>
+            <span class="step done"><span class="d"></span>android</span>
+            <span class="step done"><span class="d"></span>xml</span>
+            <span class="step done"><span class="d"></span>codegen</span>
+            <span class="step done"><span class="d"></span>written src/main</span>
+            <span class="step active"><span class="d"></span>diff vs live</span>
+          </div>
+        </div>
+
+        <h3>Findings <span class="ct">ranked by gap × recompose</span></h3>
+
+        <!-- 1 · send button: high value (drift + hot) — OPEN + SELECTED -->
+        <div class="finding sel open" id="f_send">
+          <div class="top" onclick="openFinding('f_send',this)"><span class="rank">1</span><span class="sev sev-red"></span><span class="ttl">Send button color is unbound</span><span class="loc">↻7/s</span><span class="donetag">✓ fixed</span></div>
+          <div class="body">
+            <div class="kv">
+              <span class="k">attr</span><span>backgroundTint</span>
+              <span class="k">expected</span><span class="exp">@color/accent · #22C55E</span>
+              <span class="k">on device</span><span class="act">#2A3A30 (theme fallback)</span>
+            </div>
+            <div class="codeline"><span class="file">ChatThread.kt:84 · SendButton</span><span class="ln del">- Modifier.background(color = LocalContent.current)</span><span class="ln add">+ Modifier.background(color = AppTheme.accent)  // bound</span></div>
+            <div class="actions">
+              <button class="btn btn-primary" onclick="apply(event,'live','f_send')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M13 2L3 14h7l-1 8 10-12h-7l1-8z"/></svg>Apply to live ▸</button>
+              <button class="btn" onclick="apply(event,'code','f_send')">Fix in code</button>
+              <button class="btn" onclick="apply(event,'src','f_send')">Go to source</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- 2 · me-bubble corner -->
+        <div class="finding" id="f_corner">
+          <div class="top" onclick="openFinding('f_corner',this)"><span class="rank">2</span><span class="sev sev-red"></span><span class="ttl">Me-bubble corner radius</span><span class="loc">14→8dp</span><span class="donetag">✓ fixed</span></div>
+          <div class="body">
+            <div class="kv">
+              <span class="k">attr</span><span>shape.corner</span>
+              <span class="k">expected</span><span class="exp">RoundedCornerShape(14,14,4,14)</span>
+              <span class="k">on device</span><span class="act">RoundedCornerShape(8)</span>
+            </div>
+            <div class="codeline"><span class="file">MessageBubble.kt:31 · clip</span><span class="ln del">- .clip(RoundedCornerShape(8.dp))</span><span class="ln add">+ .clip(RoundedCornerShape(14.dp,14.dp,4.dp,14.dp))</span></div>
+            <div class="actions"><button class="btn btn-primary" onclick="apply(event,'live','f_corner')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M13 2L3 14h7l-1 8 10-12h-7l1-8z"/></svg>Apply to live ▸</button><button class="btn" onclick="apply(event,'code','f_corner')">Fix in code</button></div>
+          </div>
+        </div>
+
+        <!-- 3 · title font -->
+        <div class="finding" id="f_font">
+          <div class="top" onclick="openFinding('f_font',this)"><span class="rank">3</span><span class="sev sev-amber"></span><span class="ttl">Title font size drift</span><span class="loc">11→13sp</span><span class="donetag">✓ fixed</span></div>
+          <div class="body">
+            <div class="kv"><span class="k">attr</span><span>fontSize</span><span class="k">expected</span><span class="exp">titleMedium · 11sp</span><span class="k">on device</span><span class="act">13sp (override)</span></div>
+            <div class="codeline"><span class="file">ChatThread.kt:52 · TopAppBar title</span><span class="ln del">- fontSize = 13.sp</span><span class="ln add">+ style = MaterialTheme.typography.titleMedium</span></div>
+            <div class="actions"><button class="btn btn-primary" onclick="apply(event,'live','f_font')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M13 2L3 14h7l-1 8 10-12h-7l1-8z"/></svg>Apply to live ▸</button><button class="btn" onclick="apply(event,'code','f_font')">Fix in code</button></div>
+          </div>
+        </div>
+
+        <!-- 4 · missing FAB -->
+        <div class="finding" id="f_fab">
+          <div class="top" onclick="openFinding('f_fab',this)"><span class="rank">4</span><span class="sev sev-purple"></span><span class="ttl">Scroll-to-bottom FAB missing in live</span><span class="loc">in design</span><span class="donetag">✓ added</span></div>
+          <div class="body">
+            <div class="kv"><span class="k">node</span><span>FloatingActionButton</span><span class="k">expected</span><span class="exp">present @ bottom-end</span><span class="k">on device</span><span class="act">not laid out</span></div>
+            <div class="codeline"><span class="file">ChatThread.kt:118 · Scaffold</span><span class="ln add">+ FloatingActionButton(onClick = ::scrollToEnd) { Icon(Icons.Down) }</span></div>
+            <div class="actions"><button class="btn btn-primary" onclick="apply(event,'code','f_fab')">Generate &amp; insert</button><button class="btn" onclick="apply(event,'ignore','f_fab')">Ignore</button></div>
+          </div>
+        </div>
+
+        <div class="alignnote">alignment fitted on status-bar anchor · 2 nodes · uncertain hotspots dotted</div>
+
+        <!-- run history / batch affordance -->
+        <h3>This session <span class="ct">Eval &amp; History →</span></h3>
+        <div class="histcard">
+          <div class="histrow" onclick="toast('Loading ChatThread v3 into the live diff…')"><span>ChatThread <span class="v">v3 · now</span></span><span class="sb"><i style="height:5px"></i><i style="height:8px"></i><i style="height:11px"></i><i class="cur" style="height:14px"></i></span><span class="pct">91%</span></div>
+          <div class="histrow" onclick="toast('Open run ChatThread v2 · 0:31 ago')"><span>ChatThread <span class="v">v2 · 0:31</span></span><span class="sb"><i style="height:4px"></i><i style="height:7px"></i><i class="cur" style="height:10px"></i></span><span class="pct" style="color:var(--match)">78%</span></div>
+          <div class="histrow" onclick="toast('Open run Profile · 4:12 ago')"><span>Profile <span class="v">v1 · 4:12</span></span><span class="sb"><i style="height:6px"></i><i style="height:10px"></i><i class="cur" style="height:12px"></i></span><span class="pct">88%</span></div>
+          <div class="histrow" onclick="toast('Queue local batch — Settings · Search · Detail')" style="color:var(--text-muted)"><span>+ queue screens <span class="v">batch · local</span></span><span class="sb" style="opacity:.5"><i style="height:3px"></i><i style="height:4px"></i><i style="height:3px"></i></span><span class="pct" style="color:var(--text-muted)">···</span></div>
+        </div>
+
+      </div></div>
+    </div>
+  </div>
+
+  <!-- ================= STATUS BAR (26px) ================= -->
+  <div class="statusbar">
+    <span class="seg2 ok">● local engine offline-mode</span>
+    <span class="div"></span>
+    <span class="seg2">render: <b>Roborazzi UT</b> 0.8s</span>
+    <span class="div"></span>
+    <span class="seg2">fidelity: <b id="sbFid">91%</b></span>
+    <span class="div"></span>
+    <span class="seg2">code quality: <b>87%</b></span>
+    <span class="spacer"></span>
+    <span class="seg2">last diff <b>just now</b> · on save</span>
+  </div>
+</div>
+
+<div class="toast" id="toast"><span class="ic">✓</span><span id="toastmsg">Applied to live device — gap recomputing…</span></div>
+
+<script>
+/* ---------- mode strip ---------- */
+function setMode(el){
+  document.querySelectorAll('.mode').forEach(m=>m.classList.remove('on'));
+  el.classList.add('on');
+  toast('“'+el.querySelector('span').textContent+'” mode keeps the Gap and merged tree persistent — this artifact renders Mirror');
+}
+
+/* ---------- view-mode segment ---------- */
+function setView(btn,mode){
+  document.querySelectorAll('#viewseg button').forEach(b=>b.classList.remove('on'));btn.classList.add('on');
+  const live=document.getElementById('liveLayer'),swipe=document.getElementById('swipe'),meta=document.getElementById('stagemeta');
+  if(mode==='swipe'){live.style.clipPath='inset(0 0 0 '+document.getElementById('onionRange').value+'%)';live.style.opacity='1';swipe.style.display='block';}
+  if(mode==='onion'){live.style.clipPath='none';live.style.opacity='.5';swipe.style.display='none';}
+  if(mode==='side'){live.style.clipPath='none';live.style.opacity='1';swipe.style.display='none';}
+  if(mode==='heat'){live.style.clipPath='none';live.style.opacity='.85';swipe.style.display='none';}
+  meta.textContent = mode==='heat'
+    ? 'diff-heat · BoundsOverlay canvas · 7 regions painted'
+    : '1080×2400 px · density 420dpi · status/nav cropped';
+}
+
+/* ---------- 1:1 direct-manipulation seam / onion scrubber ---------- */
+function onSwipe(v){
+  const live=document.getElementById('liveLayer'),swipe=document.getElementById('swipe');
+  if(!document.querySelector('#viewseg button:nth-child(2)').classList.contains('on')){
+    live.style.clipPath='inset(0 0 0 '+v+'%)';
+  }
+  swipe.style.left=v+'%';
+}
+/* drag the seam handle directly */
+(function(){
+  const swipe=document.getElementById('swipe'),phone=document.getElementById('phone'),range=document.getElementById('onionRange');
+  let drag=false;
+  function toPct(clientX){const r=phone.getBoundingClientRect();return Math.min(100,Math.max(0,(clientX-r.left)/r.width*100));}
+  swipe.addEventListener('mousedown',e=>{drag=true;e.preventDefault();});
+  window.addEventListener('mouseup',()=>drag=false);
+  window.addEventListener('mousemove',e=>{if(!drag)return;const p=toPct(e.clientX);range.value=p;onSwipe(p);});
+})();
+
+/* ---------- footer toggle chips ---------- */
+function toggleChip(b,kind){
+  b.classList.toggle('on');
+  if(kind==='hotspots'){document.getElementById('phone').classList.toggle('hotspots-off',!b.classList.contains('on'));}
+  if(kind==='recompose'){toast(b.classList.contains('on')?'Recompose heat overlay on — painting RecompositionStore.recompsPerSec':'Recompose heat overlay off');}
+}
+
+/* ---------- bidirectional selection: hotspot ⇄ finding ⇄ tree ---------- */
+const HOT_FOR={f_font:'A',f_corner:'B',f_send:'C',f_fab:'D'};
+const NODE_FOR={f_font:'title',f_corner:'bMe',f_send:'send',f_fab:'fab'};
+function dimOthers(activeHot){
+  document.querySelectorAll('.hot').forEach(h=>{
+    h.classList.remove('sel');
+    h.classList.toggle('dim', activeHot && h!==activeHot);
+  });
+  if(activeHot)activeHot.classList.add('sel');
+}
+function selectFinding(id,hotEl,e){
+  if(e)e.stopPropagation();
+  dimOthers(hotEl);
+  openFinding(id);
+  highlightNode(NODE_FOR[id]);
+}
+function openFinding(id,topEl){
+  document.querySelectorAll('.finding').forEach(f=>f.classList.remove('open','sel'));
+  const f=document.getElementById(id);if(!f)return;
+  f.classList.add('open','sel');
+  if(!f.classList.contains('done'))f.scrollIntoView({behavior:'smooth',block:'nearest'});
+  // light its hotspot + node too (so clicking the finding header also drives the others)
+  const hk=HOT_FOR[id];
+  if(hk){const h=document.querySelector('.hot[data-k="'+hk+'"]');dimOthers(h);}
+  highlightNode(NODE_FOR[id]);
+}
+function highlightNode(k){
+  document.querySelectorAll('.node').forEach(n=>n.classList.remove('sel'));
+  const n=document.querySelector('.node[data-k="'+k+'"]');if(n)n.classList.add('sel');
+}
+function selectNode(k,findingId){
+  highlightNode(k);
+  if(findingId){
+    const h=document.querySelector('.hot[data-k="'+HOT_FOR[findingId]+'"]');
+    dimOthers(h);openFinding(findingId);
+  }else{
+    dimOthers(null);
+  }
+}
+
+/* ---------- apply-to-live / fix-in-code (count-down the Gap) ---------- */
+function toast(msg){const t=document.getElementById('toast');document.getElementById('toastmsg').textContent=msg;t.classList.add('show');clearTimeout(t._t);t._t=setTimeout(()=>t.classList.remove('show'),2600);}
+function apply(e,kind,fid){
+  e.stopPropagation();
+  const f=document.getElementById(fid);
+  if(kind==='src'){toast('Opened ChatThread.kt:84 in editor · JewelNavigator');return;}
+  if(kind==='live'){
+    toast('Pushed value to live device via modify_view_properties — gap recomputing…');
+    closeGap(2);
+    pulseResolve(fid);
+    if(fid==='f_send'){const s=document.getElementById('liveSend');s.style.background='var(--accent)';s.style.boxShadow='0 0 10px var(--accent-glow)';}
+  }
+  if(kind==='code'){
+    toast('Edited src/main + reverted live override · re-diffing on save');
+    closeGap(1);markDone(fid);
+  }
+  if(kind==='ignore'){toast('Finding muted for this screen');markDone(fid);}
+}
+function pulseResolve(fid){
+  const hk=HOT_FOR[fid];const h=document.querySelector('.hot[data-k="'+hk+'"]');
+  if(h){h.style.boxShadow='0 0 0 4px var(--accent),0 0 22px var(--accent-glow)';
+    setTimeout(()=>{h.classList.add('resolved');},700);}
+}
+function markDone(fid){
+  const f=document.getElementById(fid);if(f){f.classList.add('done');f.classList.remove('open','sel');}
+  pulseResolve(fid);
+}
+function closeGap(by){
+  const n=document.getElementById('gapnum');let cur=parseInt(n.textContent);const target=Math.max(1,cur-by);
+  // count animation, not a snap
+  const iv=setInterval(()=>{cur--;n.innerHTML=cur+'<small>%</small>';if(cur<=target){clearInterval(iv);}},90);
+  document.getElementById('gapring').style.width=(100-target)+'%';
+  // nudge fidelity in status bar
+  const fid=document.getElementById('sbFid');fid.textContent=Math.min(99,91+by)+'%';
+}
+
+/* ---------- pipeline ticker replay ---------- */
+function regen(){
+  const t=document.getElementById('ticker');
+  const steps=t.querySelectorAll('.step');
+  steps.forEach(s=>s.classList.remove('done','active'));
+  let i=0;
+  const iv=setInterval(()=>{
+    if(i>0)steps[i-1].classList.replace('active','done');
+    if(i<steps.length){steps[i].classList.add('active');i++;}
+    else{clearInterval(iv);toast('Generated & written to src/main — diffing against live app');}
+  },380);
+}
+
+/* ---------- ambient: live recompose /s cycles every 900ms ---------- */
+setInterval(()=>{
+  const v=38+Math.floor(Math.random()*18);
+  document.getElementById('hz').textContent=v;
+  document.getElementById('tbHz').textContent=v;
+},900);
+</script>
+</body>
+</html>

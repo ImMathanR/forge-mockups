@@ -1,0 +1,489 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Forge — Accept → integrate</title>
+<style>
+:root{
+  --base:#121417;--panel:#181B20;--elev:#1F242B;--hover:#1C2128;--sel:#272E36;--input:#0E1013;--code:#0E1116;
+  --b-subtle:#21252B;--b-def:#2C313A;--b-strong:#444A54;
+  --t-pri:#E6E8EB;--t-sec:#9AA0A6;--t-mut:#6B6F78;--t-code:#B8C0CC;
+  --ac:#22C55E;--ac-h:#4ADE80;--ac-br:#86EFAC;--ac-soft:#0E2818;--ac-glow:rgba(74,222,128,.35);
+  --am:#E0B24D;--am-soft:#2A2310;--ok:#6FAE8C;--warn:#C7A77B;--dng:#CC8585;--dng-soft:#2A1414;--info:#88A9C4;--purple:#C49AD0;
+  --mono:"SF Mono",ui-monospace,"JetBrains Mono",Menlo,Consolas,monospace;--sans:-apple-system,"Inter","Segoe UI",Roboto,sans-serif;--ease:cubic-bezier(0.2,0,0,1);
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%}
+body{background:#08090b;font-family:var(--sans);color:var(--t-pri);font-size:12px;-webkit-font-smoothing:antialiased;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;overflow:hidden;height:100vh}
+.tool-window{width:1480px;height:860px;background:var(--base);border:1px solid var(--b-def);border-radius:8px;display:grid;grid-template-rows:40px 28px 1fr auto 26px;overflow:hidden;box-shadow:0 24px 80px rgba(0,0,0,.6)}
+.mono{font-family:var(--mono)}
+.toolbar{display:flex;align-items:center;gap:10px;padding:0 12px;background:var(--panel);border-bottom:1px solid var(--b-subtle)}
+.glyph{width:20px;height:20px;border-radius:6px;background:linear-gradient(145deg,#22C55E,#16833f);display:flex;align-items:center;justify-content:center;font-weight:700;font-size:12px;color:#06140b;box-shadow:0 0 12px var(--ac-glow)}
+.brand{font-size:15px;font-weight:600}.brand .sub{color:var(--t-mut);font-weight:400;font-size:11px;margin-left:4px}
+.gappill{font-family:var(--mono);font-size:10px;color:var(--ac-br);border:1px solid #1c3a28;background:var(--ac-soft);border-radius:999px;padding:3px 9px}
+.spacer{flex:1}
+.badge{font-family:var(--mono);font-size:9px;color:var(--t-mut);border:1px solid var(--b-def);border-radius:999px;padding:3px 8px}.badge b{color:var(--ac-h)}
+.livepill{display:flex;align-items:center;gap:6px;font-size:11px;color:var(--t-sec);border:1px solid var(--b-def);border-radius:999px;padding:3px 9px}
+.dot{width:7px;height:7px;border-radius:50%;background:var(--ac);box-shadow:0 0 8px var(--ac)}.dot.pulse{animation:breath 2.2s var(--ease) infinite}
+@keyframes breath{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.45;transform:scale(.78)}}
+.mode{display:flex;align-items:center;gap:2px;padding:0 10px;background:var(--base);border-bottom:1px solid var(--b-subtle);position:relative}
+.m{position:relative;padding:0 12px;height:28px;line-height:28px;font-size:12px;color:var(--t-sec)}
+.m.on{color:var(--t-pri);font-weight:500}
+#under{position:absolute;bottom:0;height:2px;background:var(--ac);border-radius:2px;box-shadow:0 0 8px var(--ac-glow);left:130px;width:64px;transition:left .35s var(--ease),width .35s var(--ease)}
+.m .badge2{margin-left:6px;font-size:10px;color:var(--ac-br);background:var(--ac-soft);border-radius:999px;padding:1px 6px}
+.mode .right{margin-left:auto;font-family:var(--mono);font-size:10px;color:var(--t-mut)}.mode .right b{color:var(--ac-h)}
+.main{display:grid;grid-template-columns:300px 1fr 320px;gap:1px;background:var(--b-subtle);overflow:hidden;min-height:0}
+.col{background:var(--panel);display:flex;flex-direction:column;min-height:0;overflow:hidden}.col.center{background:var(--base);position:relative}
+.ph{height:40px;flex:0 0 40px;display:flex;align-items:center;gap:8px;padding:0 12px;border-bottom:1px solid var(--b-subtle)}
+.ph .ttl{font-size:13px;font-weight:600}.ph .meta{margin-left:auto;font-size:10px;color:var(--t-mut);font-family:var(--mono)}
+.scroll{overflow:hidden;flex:1;min-height:0;padding:0}
+/* target picker */
+.target{margin:10px 12px;padding:9px 10px;border:1px solid var(--b-def);border-radius:6px;background:var(--elev);font-size:11px}
+.target .t1{display:flex;align-items:center;gap:6px;color:var(--t-pri)}.target .t1 b{color:var(--ac-br)}.target .t1 .cv{margin-left:auto;color:var(--t-mut)}
+.target .t2{font-family:var(--mono);font-size:10px;color:var(--t-mut);margin-top:3px}
+/* staged tree */
+.grp{font-size:9px;letter-spacing:.6px;text-transform:uppercase;color:var(--t-mut);padding:8px 12px 3px}
+.frow{display:flex;align-items:center;gap:7px;height:26px;padding:0 12px;font-size:11px;color:var(--t-sec);cursor:pointer;border-left:2px solid transparent}
+.frow:hover{background:var(--hover)}.frow.sel{background:var(--sel);border-left-color:var(--ac);color:var(--t-pri)}
+.frow .sig{font-family:var(--mono);width:12px;text-align:center;font-weight:700}
+.frow.new .sig{color:var(--ac-br)}.frow.mod .sig{color:var(--am)}.frow.merge .sig{color:var(--am)}
+.frow .cb{width:12px;height:12px;border:1px solid var(--b-strong);border-radius:3px;display:none;align-items:center;justify-content:center;font-size:9px;color:#06140b}
+.frow.hascb .cb{display:flex}.frow.hascb.on .cb{background:var(--ac);border-color:var(--ac)}
+.frow .mut{margin-left:auto;font-family:var(--mono);font-size:9px;color:var(--t-mut)}
+.frow.merge.pulse2{animation:rowpulse 1.2s var(--ease) infinite}
+@keyframes rowpulse{50%{background:var(--am-soft)}}
+.frow.done .sig{color:var(--ac-br)}
+/* preflight / right cards */
+.card{margin:10px 12px;padding:11px;border:1px solid var(--b-def);border-radius:8px;background:var(--elev)}
+.card .ch{font-size:11px;font-weight:600;margin-bottom:8px;color:var(--t-pri)}
+.chk{display:flex;align-items:center;gap:8px;font-size:11px;color:var(--t-sec);padding:4px 0}
+.chk .ck{width:14px;height:14px;border-radius:50%;border:1px solid var(--b-strong);display:flex;align-items:center;justify-content:center;font-size:9px;color:var(--t-mut)}
+.chk.ok .ck{background:var(--ac-soft);border-color:#1c3a28;color:var(--ac-br)}
+.chk.ok{color:var(--t-pri)}
+.kv2{font-family:var(--mono);font-size:10px}.kv2 div{display:flex;justify-content:space-between;padding:2px 0;border-bottom:1px dotted #20252c}.kv2 .k{color:var(--t-mut)}.kv2 .v{color:var(--ac-br)}
+/* center surfaces */
+.surface{position:absolute;inset:0;display:none;flex-direction:column;min-height:0}
+.surface.show{display:flex}
+.sf-head{height:40px;flex:0 0 40px;display:flex;align-items:center;gap:10px;padding:0 14px;border-bottom:1px solid var(--b-subtle);font-size:12px}
+.sf-head b{color:var(--t-pri)}.sf-head .tog{margin-left:auto;font-size:10px;color:var(--t-sec);border:1px solid var(--b-def);border-radius:5px;padding:3px 8px;font-family:var(--mono)}
+.sf-body{flex:1;min-height:0;overflow:hidden;padding:16px}
+/* summary (beat1) */
+.sum{display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;text-align:center;gap:8px}
+.sum .big{font-size:18px;font-weight:600}
+.sum .line{font-family:var(--mono);font-size:12px;color:var(--ac-br)}
+.sum .sub{font-size:12px;color:var(--t-sec);max-width:360px;line-height:1.6;margin-top:8px;padding:10px 14px;border:1px dashed var(--b-def);border-radius:8px;background:rgba(255,255,255,.012)}
+.sum .sub b{color:var(--t-pri)}
+/* diff (beat2) */
+.brc{font-family:var(--mono);font-size:10px;color:var(--t-mut);padding:6px 14px;border-bottom:1px solid var(--b-subtle)}.brc b{color:var(--ac-br)}.brc .o{color:var(--dng)}
+.diff{font-family:var(--mono);font-size:11px;line-height:1.7;padding:8px 0;flex:1;overflow:hidden;background:var(--code)}
+.dl{display:flex;padding:0 14px;white-space:pre}
+.dl .gut{width:14px;flex:0 0 14px;color:var(--t-mut);text-align:center;margin-right:8px}
+.dl.add{background:rgba(34,197,94,.06)}.dl.add .gut{color:var(--ac)}.dl.add .tx{color:var(--ac-br)}
+.dl.rem{background:rgba(204,133,133,.06)}.dl.rem .gut{color:var(--dng)}.dl.rem .tx{color:var(--dng);text-decoration:line-through;text-decoration-color:rgba(204,133,133,.5)}
+.dl .tx{color:var(--t-code)}
+.pill{font-family:var(--mono);font-size:8px;color:var(--am);border:1px solid #3a3015;background:var(--am-soft);border-radius:999px;padding:0 5px;margin-left:8px;text-decoration:none!important;display:inline-block}
+/* merge (beat3) */
+.merge3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:1px;background:var(--b-subtle);border:1px solid var(--b-subtle);border-radius:6px;overflow:hidden;font-family:var(--mono);font-size:10px}
+.mcol{background:var(--code);min-height:0}
+.mcol .mh{padding:6px 9px;font-size:9px;color:var(--t-mut);border-bottom:1px solid var(--b-subtle);text-transform:uppercase;letter-spacing:.4px;background:var(--panel)}
+.mrow{padding:4px 9px;border-bottom:1px dotted #1a1f25;display:flex;align-items:center;gap:6px;color:var(--t-code);min-height:24px}
+.mrow .s{width:10px;color:var(--t-mut)}.mrow.add{color:var(--ac-br)}.mrow.add .s{color:var(--ac)}
+.mrow.skip{color:var(--t-mut)}.mrow.col{color:var(--am)}.mrow.col .s{color:var(--am)}
+.col-detail{margin-top:10px;border:1px solid #3a3015;background:rgba(224,178,77,.05);border-radius:6px;padding:10px}
+.col-detail.resolved{border-color:#1c3a28;background:rgba(34,197,94,.05)}
+.col-detail .ct{font-family:var(--mono);font-size:10px;color:var(--am);margin-bottom:7px}
+.col-detail.resolved .ct{color:var(--ac-br)}
+.radio{display:flex;gap:8px}
+.rb{font-size:10px;color:var(--t-sec);border:1px solid var(--b-def);border-radius:5px;padding:5px 9px;cursor:pointer;font-family:var(--mono)}
+.rb.on{border-color:var(--ac);background:var(--ac-soft);color:var(--ac-br)}
+.amberstrip{padding:7px 14px;font-size:11px;color:var(--am);background:var(--am-soft);border-top:1px solid #3a3015;display:flex;align-items:center;gap:7px}
+.amberstrip.gone{display:none}
+/* approve bar */
+.bottombars{display:flex;flex-direction:column}
+.approve{display:none;border-top:1px solid #1c3a28;background:linear-gradient(180deg,rgba(34,197,94,.08),rgba(34,197,94,.02));padding:10px 14px;align-items:center;gap:16px}
+.approve.show{display:flex}
+.approve .scope{font-family:var(--mono);font-size:10px;color:var(--t-sec)}.approve .scope b{color:var(--ac-br)}
+.approve .pf{display:flex;gap:10px;font-family:var(--mono);font-size:10px;color:var(--ok)}
+.approve .note{font-size:10px;color:var(--t-mut);max-width:230px;line-height:1.4}
+.approve .cta{margin-left:auto;display:flex;flex-direction:column;gap:5px;align-items:flex-end}
+.approve .btn{border:0;border-radius:6px;padding:9px 16px;font-size:12px;font-weight:600;background:var(--ac);color:#06140b;box-shadow:0 0 14px var(--ac-glow);cursor:pointer;animation:armpulse 1.5s var(--ease) infinite}
+@keyframes armpulse{0%,100%{box-shadow:0 0 14px var(--ac-glow)}50%{box-shadow:0 0 24px var(--ac-glow)}}
+.approve .opt{font-size:10px;color:var(--t-mut);font-family:var(--mono)}.approve .opt b{color:var(--t-sec)}
+/* undo bar */
+.undo{display:none;border-top:1px solid var(--b-subtle);border-left:3px solid var(--ac);background:var(--elev);padding:9px 14px;align-items:center;gap:12px}
+.undo.show{display:flex}
+.undo .ut{font-size:11px;color:var(--t-pri)}.undo .ut b{color:var(--ac-br)}
+.undo .ub{margin-left:auto;font-size:11px;border:1px solid var(--b-strong);border-radius:5px;padding:6px 12px;color:var(--am);cursor:pointer;font-family:var(--mono)}
+.undo .ub:hover{background:var(--dng-soft);color:var(--dng);border-color:var(--dng)}
+.undo .keep{font-size:11px;border:1px solid var(--b-def);border-radius:5px;padding:6px 12px;color:var(--t-sec);cursor:pointer}
+/* write (beat5) */
+.wbody{display:flex;flex-direction:column;height:100%;padding:14px;gap:12px}
+.wbar{display:flex;gap:4px}.wbar b{flex:1;height:6px;border-radius:3px;background:#23272e}.wbar b.done{background:var(--ac);box-shadow:0 0 8px var(--ac-glow)}.wbar b.now{background:var(--ac-h);animation:flick .8s steps(2) infinite}
+@keyframes flick{50%{opacity:.5}}
+.wlog{flex:1;font-family:var(--mono);font-size:11px;line-height:1.9;color:var(--t-sec);background:var(--code);border:1px solid var(--b-subtle);border-radius:6px;padding:10px 12px;overflow:hidden}
+.wlog .ok{color:var(--ac-br)}.wlog .mut{color:var(--t-mut)}.wlog .am{color:var(--am)}
+/* editor peek (beat6) */
+.editor{flex:1;font-family:var(--mono);font-size:11px;line-height:1.8;background:var(--code);overflow:hidden;position:relative}
+.eline{display:flex;padding:0 14px;white-space:pre}.eline .eg{width:18px;flex:0 0 18px}.eline.chg .eg{background:var(--ac);box-shadow:2px 0 6px var(--ac-glow)}
+.eline .et{color:var(--t-code)}.eline.chg .et{color:var(--ac-br)}.eline .kw{color:#88A9C4}.eline .cm{color:var(--t-mut)}
+.cornphone{position:absolute;right:16px;bottom:16px;width:78px;height:166px;border-radius:14px;background:#05070a;border:1px solid #2a3038;box-shadow:0 12px 30px rgba(0,0,0,.5);padding:3px}
+.cornphone .cs{position:absolute;inset:3px;border-radius:11px;background:#0f1216;display:flex;flex-direction:column}
+.cornphone .ca{height:14px;border-bottom:1px solid #1b2026;display:flex;align-items:center;padding:0 5px;gap:3px}.cornphone .cav{width:8px;height:8px;border-radius:50%;background:#3a4250}
+.cornphone .cl{flex:1;padding:5px;display:flex;flex-direction:column;gap:3px}.cornphone .cb1{width:60%;height:7px;border-radius:4px;background:#1c222b}.cornphone .cb2{align-self:flex-end;width:55%;height:7px;border-radius:4px;background:#173a26}
+.cornphone .cm{height:14px;border-top:1px solid #1b2026;display:flex;align-items:center;justify-content:flex-end;padding:0 5px}.cornphone .csend{width:9px;height:9px;border-radius:50%;background:var(--ac);box-shadow:0 0 5px var(--ac-glow)}
+.cornphone .tag{position:absolute;top:-8px;left:50%;transform:translateX(-50%);font-size:7px;font-family:var(--mono);color:var(--ac-br);background:rgba(8,10,12,.9);border:1px solid #1c3a28;border-radius:999px;padding:1px 5px;white-space:nowrap}
+/* right done exits */
+.exit{display:block;width:100%;text-align:left;font-size:11px;border:1px solid var(--b-def);border-radius:6px;padding:8px 10px;color:var(--t-sec);background:transparent;cursor:pointer;margin-bottom:7px}
+.exit:hover{background:var(--hover);color:var(--t-pri)}.exit.amber{color:var(--am);border-color:#3a3015}
+.prcard{margin:10px 12px;border:1px solid #1c3a28;border-radius:8px;background:rgba(34,197,94,.04);padding:10px;font-size:11px}
+.prcard .pt{color:var(--ac-br);font-weight:600;margin-bottom:3px}.prcard .ps{font-family:var(--mono);font-size:10px;color:var(--t-sec);line-height:1.5}
+.statusbar{display:flex;align-items:center;gap:16px;padding:0 12px;background:var(--panel);border-top:1px solid var(--b-subtle);font-size:10px;color:var(--t-mut);font-family:var(--mono)}
+.statusbar b{color:var(--ac-br)}.statusbar .s-ok{color:var(--ok)}.statusbar .sp{margin-left:auto}
+/* director */
+.director{width:1480px;display:flex;align-items:center;gap:14px;padding:10px 14px;background:#0e1014;border:1px solid var(--b-def);border-radius:8px}
+.director .play{background:var(--ac);color:#06140b;border:0;border-radius:6px;padding:7px 16px;font-weight:600;font-size:12px;cursor:pointer}
+.director .replay{background:transparent;border:1px solid var(--b-def);color:var(--t-sec);border-radius:6px;padding:7px 12px;cursor:pointer;font-size:12px}
+.beats{display:flex;gap:6px;margin-left:8px}
+.beat{display:flex;align-items:center;gap:7px;font-size:11px;color:var(--t-mut);cursor:pointer;padding:4px 8px;border-radius:999px}
+.beat .bd{width:7px;height:7px;border-radius:50%;background:#2c3640}
+.beat.on{color:var(--ac-br);background:var(--ac-soft)}.beat.on .bd{background:var(--ac);box-shadow:0 0 8px var(--ac-glow)}.beat.done .bd{background:var(--ok)}
+.director .cap{margin-left:auto;font-family:var(--mono);font-size:10px;color:var(--t-sec)}
+</style>
+</head>
+<body>
+<div class="tool-window">
+  <div class="toolbar">
+    <div class="glyph">F</div><div class="brand">Forge<span class="sub">· D2C · live inspector</span></div>
+    <div class="gappill" id="gapPill">Gap 1% ▸ 99% fidelity</div>
+    <div class="spacer"></div>
+    <div class="badge">d2c-engine ⇆ stdio · <b>PSI WriteCommandAction</b></div>
+    <div class="livepill"><span class="dot pulse"></span> Pixel 8 · API 34 · live</div>
+  </div>
+
+  <div class="mode">
+    <div class="m">Sandbox</div>
+    <div class="m">Mirror</div>
+    <div class="m on" id="mInt">Integrate<span class="badge2" id="mBadge">4 files</span></div>
+    <div id="under"></div>
+    <div class="right" id="modeRight">target: <b>com.acme.chat</b> · review before write</div>
+  </div>
+
+  <div class="main">
+    <!-- LEFT -->
+    <div class="col">
+      <div class="ph"><span class="ttl" id="lTtl">Staged changes</span><span class="meta" id="lMeta">4 files</span></div>
+      <div class="scroll">
+        <!-- staged -->
+        <div id="leftStaged">
+          <div class="target"><div class="t1">app › <b>:feature-chat</b><span class="cv">▾</span></div><div class="t2">package com.acme.chat · src/main/java</div></div>
+          <div class="grp">Modified (1)</div>
+          <div class="frow mod hascb on" data-file="chat" id="rowChat"><span class="cb">✓</span><span class="sig">~</span><span class="nm">ChatThreadScreen.kt</span><span class="mut">+148</span></div>
+          <div class="grp">New (2)</div>
+          <div class="frow new hascb on sel" data-file="bubble" id="rowBubble"><span class="cb">✓</span><span class="sig">+</span><span class="nm">MessageBubble.kt</span><span class="mut">+96</span></div>
+          <div class="frow new hascb on" data-file="icon" id="rowIcon"><span class="cb">✓</span><span class="sig">+</span><span class="nm">ic_send.xml</span><span class="mut">vector</span></div>
+          <div class="grp">Merge — :core:design (1)</div>
+          <div class="frow merge hascb on" data-file="colors" id="rowColors"><span class="cb">✓</span><span class="sig">⇉</span><span class="nm">colors.xml</span><span class="mut" id="colorsMut">4+1⚠</span></div>
+        </div>
+        <!-- real tree -->
+        <div id="leftReal" style="display:none">
+          <div class="grp">com.acme.chat · :feature-chat</div>
+          <div class="frow done"><span class="sig">✓</span><span class="nm">ChatThreadScreen.kt</span><span class="mut">opened</span></div>
+          <div class="frow done"><span class="sig">✓</span><span class="nm">MessageBubble.kt</span><span class="mut">new</span></div>
+          <div class="frow done"><span class="sig">✓</span><span class="nm">ic_send.xml</span><span class="mut">new</span></div>
+          <div class="grp">:core:design</div>
+          <div class="frow done"><span class="sig">✓</span><span class="nm">res/values/colors.xml</span><span class="mut">+4 tags</span></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- CENTER -->
+    <div class="col center">
+      <!-- beat1 summary -->
+      <div class="surface" id="sfSummary">
+        <div class="sf-head"><b>Staging</b> → review before write</div>
+        <div class="sf-body"><div class="sum">
+          <div class="big">Staging your changes</div>
+          <div class="line">Writing into com.acme.chat · 4 files · +244 −18 · 1 merge needs your eyes</div>
+          <div class="sub"><b>Nothing is written to your module yet.</b> Forge computed the diff, remapped the package, and resolved placement. Review each file, then approve — it lands as one undoable write.</div>
+        </div></div>
+      </div>
+      <!-- beat2 diff -->
+      <div class="surface" id="sfDiff">
+        <div class="sf-head"><b>MessageBubble.kt</b> · NEW · com.acme.chat<span class="tog">unified / split ▾</span></div>
+        <div class="brc">sandbox: <span class="o">com.example.allinone</span> → real: <b>com.acme.chat</b> · 16 imports remapped</div>
+        <div class="diff">
+          <div class="dl rem"><span class="gut">-</span><span class="tx">package com.example.allinone.chat</span></div>
+          <div class="dl add"><span class="gut">+</span><span class="tx">package com.acme.chat</span><span class="pill">remapped</span></div>
+          <div class="dl rem"><span class="gut">-</span><span class="tx">import com.example.allinone.R</span></div>
+          <div class="dl add"><span class="gut">+</span><span class="tx">import com.acme.chat.R</span><span class="pill">remapped</span></div>
+          <div class="dl add"><span class="gut">+</span><span class="tx">import androidx.compose.material3.Surface</span></div>
+          <div class="dl add"><span class="gut">+</span><span class="tx">import androidx.compose.material3.Text</span></div>
+          <div class="dl"><span class="gut"> </span><span class="tx"> </span></div>
+          <div class="dl add"><span class="gut">+</span><span class="tx">@Composable</span></div>
+          <div class="dl add"><span class="gut">+</span><span class="tx">fun MessageBubble(msg: ChatMessage, mine: Boolean) {</span></div>
+          <div class="dl add"><span class="gut">+</span><span class="tx">    Surface(color = if (mine) ChatColors.me else ChatColors.them,</span></div>
+          <div class="dl add"><span class="gut">+</span><span class="tx">        shape = RoundedCornerShape(14.dp,14.dp,4.dp,14.dp)) {</span></div>
+          <div class="dl add"><span class="gut">+</span><span class="tx">        AppText(msg.text, style = AppTheme.typography.p2_regular)</span></div>
+          <div class="dl add"><span class="gut">+</span><span class="tx">    }</span></div>
+          <div class="dl add"><span class="gut">+</span><span class="tx">}</span></div>
+        </div>
+      </div>
+      <!-- beat3 merge -->
+      <div class="surface" id="sfMerge">
+        <div class="sf-head"><b>colors.xml</b> · :core:design · res/values · MERGE</div>
+        <div class="sf-body" style="padding:14px;display:flex;flex-direction:column;min-height:0">
+          <div class="merge3" style="flex:1">
+            <div class="mcol"><div class="mh">Yours (current)</div>
+              <div class="mrow skip"><span class="s">=</span>primary #3B82F6</div>
+              <div class="mrow"><span class="s"> </span>(none)</div>
+              <div class="mrow"><span class="s"> </span>(none)</div>
+              <div class="mrow col"><span class="s">⚠</span>surface #101317</div>
+            </div>
+            <div class="mcol"><div class="mh">Generated</div>
+              <div class="mrow skip"><span class="s">=</span>(skip — identical)</div>
+              <div class="mrow add"><span class="s">+</span>accent #22C55E</div>
+              <div class="mrow add"><span class="s">+</span>accentBright #4ADE80</div>
+              <div class="mrow col"><span class="s">⚠</span>surface #121417</div>
+            </div>
+            <div class="mcol"><div class="mh">Result after merge</div>
+              <div class="mrow skip"><span class="s">=</span>primary #3B82F6</div>
+              <div class="mrow add"><span class="s">+</span>accent #22C55E</div>
+              <div class="mrow add"><span class="s">+</span>accentBright #4ADE80</div>
+              <div class="mrow col" id="mResult"><span class="s">⚠</span>surface — choose</div>
+            </div>
+          </div>
+          <div class="col-detail" id="colDetail">
+            <div class="ct" id="colCt">⚠ COLLISION — &lt;color name="surface"&gt; exists with a different value. Choose (default keeps yours):</div>
+            <div class="radio">
+              <span class="rb on" data-r="yours">keep yours · #101317</span>
+              <span class="rb" data-r="gen">take generated · #121417</span>
+              <span class="rb" data-r="both">keep both · rename surfaceV2</span>
+            </div>
+          </div>
+        </div>
+        <div class="amberstrip" id="amberStrip">⚠ 1 conflict must be resolved before integrate.</div>
+      </div>
+      <!-- beat4 approve-center -->
+      <div class="surface" id="sfApprove">
+        <div class="sf-head"><b>All reviewed</b> · ready to integrate</div>
+        <div class="sf-body"><div class="sum">
+          <div class="big" style="color:var(--ac-br)">✓ 4 files reviewed · merge resolved</div>
+          <div class="sub" style="border-style:solid;border-color:#1c3a28;background:rgba(34,197,94,.03)">Every byte that will touch <b>com.acme.chat</b> has been seen. Approve below to write it all in one transaction.</div>
+        </div></div>
+      </div>
+      <!-- beat5 write -->
+      <div class="surface" id="sfWrite">
+        <div class="sf-head"><b>Integrating…</b> <span id="wcount" style="color:var(--ac-br);font-family:var(--mono)">3 / 4</span><span class="tog">single transaction</span></div>
+        <div class="wbody">
+          <div class="wbar"><b class="done"></b><b class="done"></b><b class="done"></b><b class="now"></b></div>
+          <div class="wlog">
+            <div><span class="ok">✓</span> rewrite pkg com.example.allinone → com.acme.chat · <span class="mut">2 files</span></div>
+            <div><span class="ok">✓</span> ChatThreadScreen.kt <span class="mut">written · reformatted · indexed</span></div>
+            <div><span class="ok">✓</span> MessageBubble.kt (+96) <span class="mut">written · reformatted · indexed</span></div>
+            <div><span class="ok">✓</span> ic_send.xml <span class="mut">→ res/drawable/ (guarded)</span></div>
+            <div><span class="am">⇉</span> merge colors.xml — 4 new tags, yours kept <span class="mut">(writing last)…</span></div>
+            <div style="margin-top:6px"><span class="mut">local module touched · </span><span class="ok">remote build NOT triggered</span></div>
+          </div>
+        </div>
+      </div>
+      <!-- beat6 editor -->
+      <div class="surface" id="sfEditor">
+        <div class="sf-head"><b>ChatThreadScreen.kt</b> — opened in editor<span class="tog" style="color:var(--ac-br);border-color:#1c3a28">● in your codebase</span></div>
+        <div class="editor">
+          <div class="eline chg"><span class="eg"></span><span class="et"><span class="kw">package</span> com.acme.chat</span></div>
+          <div class="eline chg"><span class="eg"></span><span class="et"><span class="kw">import</span> com.acme.chat.R</span></div>
+          <div class="eline"><span class="eg"></span><span class="et"><span class="kw">import</span> androidx.compose.runtime.Composable</span></div>
+          <div class="eline"><span class="eg"></span><span class="et"> </span></div>
+          <div class="eline chg"><span class="eg"></span><span class="et"><span class="cm">// generated by Forge · Mirror gap 8%→1%</span></span></div>
+          <div class="eline chg"><span class="eg"></span><span class="et"><span class="kw">@Composable</span></span></div>
+          <div class="eline chg"><span class="eg"></span><span class="et"><span class="kw">fun</span> ChatThreadScreen() {</span></div>
+          <div class="eline chg"><span class="eg"></span><span class="et">    Column(Modifier.fillMaxSize()) {</span></div>
+          <div class="eline chg"><span class="eg"></span><span class="et">        ChatTopBar(title = "Aria Chen")</span></div>
+          <div class="eline chg"><span class="eg"></span><span class="et">        LazyColumn(Modifier.weight(1f)) { … }</span></div>
+          <div class="eline chg"><span class="eg"></span><span class="et">        Composer(onSend = vm::send)</span></div>
+          <div class="eline chg"><span class="eg"></span><span class="et">    }</span></div>
+          <div class="eline chg"><span class="eg"></span><span class="et">}</span></div>
+          <div class="cornphone"><div class="tag">overrides reverted ✓</div><div class="cs"><div class="ca"><div class="cav"></div></div><div class="cl"><div class="cb1"></div><div class="cb2"></div><div class="cb1"></div></div><div class="cm"><div class="csend"></div></div></div></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- RIGHT -->
+    <div class="col">
+      <div class="ph"><span class="ttl" id="rTtl">Pre-flight</span><span class="meta" id="rMeta">computing</span></div>
+      <div class="scroll" id="rightWrap">
+        <!-- preflight (beat1/4) -->
+        <div id="rPreflight">
+          <div class="card"><div class="ch">Pre-flight</div>
+            <div class="chk ok" id="pf1"><span class="ck">✓</span>package remap target detected</div>
+            <div class="chk ok" id="pf2"><span class="ck">✓</span>no .kt path collisions <span style="color:var(--t-mut)">(1 intended modify)</span></div>
+            <div class="chk ok" id="pf3"><span class="ck">✓</span>sandbox compiled green</div>
+            <div class="chk" id="pf4"><span class="ck">⚠</span>1 res merge — needs review</div>
+          </div>
+          <div class="card" style="background:var(--panel)"><div class="ch" style="font-size:10px;color:var(--t-mut)">Honesty</div>
+            <div style="font-size:11px;color:var(--t-sec);line-height:1.5">Fidelity proven against the <b style="color:var(--t-pri)">sandbox</b> compile — not your real module (it builds remotely). Remote CI is the real verifier.</div></div>
+        </div>
+        <!-- this file (beat2) -->
+        <div id="rThisFile" style="display:none">
+          <div class="card"><div class="ch">This file</div>
+            <div class="kv2">
+              <div><span class="k">origin</span><span class="v">Mirror · gap fixes</span></div>
+              <div><span class="k">imports remapped</span><span class="v">16</span></div>
+              <div><span class="k">status</span><span class="v">NEW · +96 −0</span></div>
+            </div>
+            <div style="font-family:var(--mono);font-size:9px;color:var(--t-mut);margin-top:8px;line-height:1.5">lands at:<br>app/src/main/java/<br>com/acme/chat/MessageBubble.kt</div>
+          </div>
+          <div class="card" style="background:var(--panel)"><div style="font-size:11px;color:var(--t-sec);line-height:1.5"><b style="color:var(--am)">remap unsure?</b> Forge flags any <span class="mono">com.example.allinone</span> token inside a string/comment for review — never rewritten silently.</div></div>
+        </div>
+        <!-- merge summary (beat3) -->
+        <div id="rMergeSum" style="display:none">
+          <div class="card"><div class="ch">Merge summary</div>
+            <div class="kv2"><div><span class="k">new tags</span><span class="v">4</span></div><div><span class="k">collisions</span><span class="v" id="msColl" style="color:var(--am)">1 (1 unresolved)</span></div><div><span class="k">removed</span><span class="v">0 (union)</span></div></div>
+            <button class="exit" style="margin-top:9px">open real colors.xml (read-only) ▸</button>
+          </div>
+          <div class="card" style="background:var(--panel)"><div style="font-size:11px;color:var(--t-sec);line-height:1.5">Non-destructive: the merge <b style="color:var(--t-pri)">keeps every existing tag</b> (deletion-free union). Identical tags are skipped.</div></div>
+        </div>
+        <!-- ready (beat4) -->
+        <div id="rReady" style="display:none">
+          <div class="card" style="border-color:#1c3a28"><div class="ch" style="color:var(--ac-br)">Ready</div>
+            <div class="kv2"><div><span class="k">files</span><span class="v">4</span></div><div><span class="k">→ modules</span><span class="v">2</span></div><div><span class="k">target</span><span class="v">com.acme.chat</span></div></div>
+          </div>
+        </div>
+        <!-- writing (beat5) -->
+        <div id="rWriting" style="display:none">
+          <div class="grp">real module (materializing)</div>
+          <div class="frow done"><span class="sig">✓</span><span class="nm">ChatThreadScreen.kt</span></div>
+          <div class="frow done"><span class="sig">✓</span><span class="nm">MessageBubble.kt</span></div>
+          <div class="frow done"><span class="sig">✓</span><span class="nm">ic_send.xml</span></div>
+          <div class="frow merge"><span class="sig">⇉</span><span class="nm">colors.xml</span><span class="mut">writing…</span></div>
+        </div>
+        <!-- done (beat6) -->
+        <div id="rDone" style="display:none">
+          <div class="card" style="border-color:#1c3a28"><div class="ch" style="color:var(--ac-br)">✓ Done</div>
+            <div class="kv2"><div><span class="k">written</span><span class="v">4 files</span></div><div><span class="k">modules</span><span class="v">2</span></div></div>
+          </div>
+          <div style="padding:0 12px">
+            <button class="exit">Open diff in Git ▸</button>
+            <button class="exit">Mirror again — re-diff the real code ▸</button>
+            <button class="exit amber">Undo integration ⌘Z</button>
+          </div>
+          <div class="prcard"><div class="pt">PR ready</div><div class="ps">branch forge/chat-mirror-99<br>“Mirror gap 8%→1% · ChatThreadScreen”<br>View on remote ▸ <span style="color:var(--t-mut)">(CI runs the big-app build)</span></div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- BOTTOM BARS -->
+  <div class="bottombars">
+    <div class="approve" id="approveBar">
+      <div class="scope">4 files · <b>+244 −18</b> · com.acme.chat</div>
+      <div class="pf">remap ✓ · no collisions ✓ · sandbox green ✓ · 1 merge ✓</div>
+      <div class="note">Your real app builds remotely — this is a clean write, not a local build. You'll compile on your own time.</div>
+      <div class="cta">
+        <button class="btn">Integrate 4 files into com.acme.chat ▸</button>
+        <div class="opt">☑ <b>open changed files after write</b> · ○ auto-PR ⌥ · Copy as patch</div>
+      </div>
+    </div>
+    <div class="undo" id="undoBar">
+      <div class="ut">✓ <b>Integrated into com.acme.chat</b> — 4 files · 1 transaction · reformatted &amp; indexed</div>
+      <button class="keep">Keep ✓</button>
+      <button class="ub">Undo ⌘Z</button>
+    </div>
+  </div>
+
+  <div class="statusbar">
+    <span class="s-ok" id="stEngine">● local engine offline-mode</span>
+    <span id="stMid">sandbox build OK · 0 errors · ready to place</span>
+    <span class="sp" id="stLast">review before write</span>
+  </div>
+</div>
+
+<div class="director">
+  <button class="play" id="playBtn">▶ Play accept → integrate</button>
+  <button class="replay" id="replayBtn">⟲ Reset</button>
+  <div class="beats" id="beats">
+    <div class="beat" data-s="0"><span class="bd"></span>Stage</div>
+    <div class="beat" data-s="1"><span class="bd"></span>Diff</div>
+    <div class="beat" data-s="2"><span class="bd"></span>Merge gate</div>
+    <div class="beat" data-s="3"><span class="bd"></span>Approve</div>
+    <div class="beat" data-s="4"><span class="bd"></span>Write</div>
+    <div class="beat" data-s="5"><span class="bd"></span>Integrated</div>
+  </div>
+  <div class="cap" id="dirCap">accept → review the diff → resolve the merge → one clean, undoable write</div>
+</div>
+
+<script>
+(function(){
+  var $=function(id){return document.getElementById(id);};
+  var timers=[];
+  function after(ms,fn){var t=setTimeout(fn,ms);timers.push(t);return t;}
+  function clearAll(){timers.forEach(clearTimeout);timers=[];}
+  function setBeat(n){[].forEach.call($('beats').children,function(b){var s=+b.dataset.s;b.classList.toggle('on',s===n);b.classList.toggle('done',s<n);});}
+  function cap(t){$('dirCap').textContent=t;}
+  function show(id){['sfSummary','sfDiff','sfMerge','sfApprove','sfWrite','sfEditor'].forEach(function(s){$(s).classList.toggle('show',s===id);});}
+  function showRight(id){['rPreflight','rThisFile','rMergeSum','rReady','rWriting','rDone'].forEach(function(s){$(s).style.display=(s===id)?'':'none';});}
+  function leftReal(on){$('leftStaged').style.display=on?'none':'';$('leftReal').style.display=on?'':'none';}
+
+  function gotoBeat(n){
+    clearAll();setBeat(n);
+    // defaults
+    $('approveBar').classList.remove('show');$('undoBar').classList.remove('show');
+    $('under').style.left='130px';$('under').style.width='64px';$('mInt').className='m on';
+    leftReal(n>=4);
+    $('amberStrip').classList.remove('gone');
+    if(n===0){show('sfSummary');showRight('rPreflight');$('lTtl').textContent='Staged changes';$('lMeta').textContent='4 files';$('rTtl').textContent='Pre-flight';$('rMeta').textContent='computing';$('mBadge').textContent='4 files';$('modeRight').innerHTML='target: <b>com.acme.chat</b> · review before write';$('stMid').textContent='sandbox build OK · 0 errors · ready to place';$('stLast').textContent='nothing written yet';cap('① Accept → staging. The diff is computed; nothing is written yet.');
+      document.querySelectorAll('.frow').forEach(function(r){r.classList.remove('hascb');});}
+    if(n===1){show('sfDiff');showRight('rThisFile');$('rTtl').textContent='This file';$('rMeta').textContent='MessageBubble.kt';$('stMid').textContent='diff ready · 16 imports remapped';$('stLast').textContent='j/k hunks · click a file';cap('② Every byte before it lands — the package remaps into com.acme.chat, flagged in amber.');
+      document.querySelectorAll('.frow').forEach(function(r){if(r.dataset.file)r.classList.add('hascb');});$('rowBubble').classList.add('sel');$('rowChat').classList.remove('sel');}
+    if(n===2){show('sfMerge');showRight('rMergeSum');$('rTtl').textContent='Merge';$('rMeta').textContent='colors.xml';$('stMid').textContent='1 collision · review before write';$('stLast').textContent='resolve to integrate';cap("③ The res-merge gate — a colliding tag can't slip through. Resolve, or it won't write.");
+      // unresolved state
+      $('colDetail').classList.remove('resolved');$('amberStrip').classList.remove('gone');$('mResult').innerHTML='<span class="s">⚠</span>surface — choose';$('msColl').textContent='1 (1 unresolved)';$('msColl').style.color='var(--am)';document.querySelectorAll('.rb').forEach(function(r){r.classList.toggle('on',r.dataset.r==='yours');});
+      $('rowColors').classList.add('pulse2');}
+    if(n>=3){$('rowColors').classList.remove('pulse2');}
+    if(n===3){show('sfApprove');showRight('rReady');$('approveBar').classList.add('show');$('rTtl').textContent='Ready';$('rMeta').textContent='4 files';$('stMid').textContent='pre-flight green';$('stLast').textContent='one approval = one undoable write';cap('④ Pre-flight green. One approval → one clean, undoable write. No local build.');
+      // merge resolved visuals carry over
+      $('colorsMut').textContent='✓';$('colorsMut').style.color='var(--ac-br)';}
+    if(n===4){show('sfWrite');showRight('rWriting');$('lTtl').textContent='Writing';$('lMeta').textContent='1 txn';$('rTtl').textContent='Real module';$('rMeta').textContent='materializing';$('mInt').className='m on';$('mBadge').textContent='writing';$('stMid').innerHTML='<b>WriteCommandAction</b> · 4 files · single transaction · undoable';$('stLast').textContent='local module touched · remote build NOT triggered';cap('⑤ One atomic transaction. Files land, reformatted, indexed — remote build untouched.');}
+    if(n===5){show('sfEditor');showRight('rDone');$('undoBar').classList.add('show');$('lTtl').textContent='Project';$('lMeta').textContent='real';$('rTtl').textContent='Done';$('rMeta').textContent='4 files';$('mInt').innerHTML='Integrate ✓';$('gapPill').textContent='Gap 1% · ✓ in your codebase';$('modeRight').innerHTML='screen: <b>ChatThreadScreen</b> · integrated';$('stMid').textContent='integrated · com.acme.chat · undoable';$('stLast').textContent='remote build pending (your call)';cap('⑥ In your real module — review in Git, undo in one keystroke, or Mirror again.');}
+  }
+  window.gotoBeat=gotoBeat;
+
+  // interactions
+  document.querySelectorAll('.frow[data-file]').forEach(function(r){r.addEventListener('click',function(){
+    document.querySelectorAll('.frow').forEach(function(x){x.classList.remove('sel');});r.classList.add('sel');
+    var f=r.dataset.file;if(f==='colors')gotoBeat(2);else if(f==='bubble'||f==='chat'||f==='icon'){gotoBeat(1);r.classList.add('sel');}
+  });});
+  document.querySelectorAll('.rb').forEach(function(b){b.addEventListener('click',function(){
+    document.querySelectorAll('.rb').forEach(function(x){x.classList.remove('on');});b.classList.add('on');
+    var v=b.dataset.r;var val=v==='yours'?'#101317':(v==='gen'?'#121417':'#101317 + surfaceV2');
+    $('mResult').innerHTML='<span class="s">+</span>surface '+val;$('mResult').className='mrow add';
+    $('colDetail').classList.add('resolved');$('colCt').textContent='✓ resolved — '+(v==='both'?'kept both (surface + surfaceV2)':(v==='gen'?'took generated #121417':'kept yours #101317'));
+    $('amberStrip').classList.add('gone');$('msColl').textContent='1 (resolved)';$('msColl').style.color='var(--ac-br)';
+  });});
+
+  function reset(){clearAll();$('gapPill').textContent='Gap 1% ▸ 99% fidelity';$('colorsMut').textContent='4+1⚠';$('colorsMut').style.color='';gotoBeat(0);}
+
+  function play(){
+    reset();var T=0;var seq=function(ms,fn){after(T+=ms,fn);};
+    seq(800,function(){gotoBeat(0);});
+    seq(1900,function(){gotoBeat(1);});
+    seq(2100,function(){gotoBeat(2);});
+    seq(1600,function(){ // resolve the collision live
+      var b=document.querySelector('.rb[data-r="yours"]');
+      $('mResult').innerHTML='<span class="s">+</span>surface #101317';$('mResult').className='mrow add';
+      $('colDetail').classList.add('resolved');$('colCt').textContent='✓ resolved — kept yours #101317';$('amberStrip').classList.add('gone');$('msColl').textContent='1 (resolved)';$('msColl').style.color='var(--ac-br)';
+      cap('③ Collision resolved (kept yours) — the gate clears, integrate arms.');});
+    seq(1400,function(){gotoBeat(3);});
+    seq(1900,function(){gotoBeat(4);});
+    seq(2100,function(){gotoBeat(5);});
+  }
+  $('beats').addEventListener('click',function(e){var b=e.target.closest('.beat');if(b)gotoBeat(+b.dataset.s);});
+  $('playBtn').addEventListener('click',play);
+  $('replayBtn').addEventListener('click',reset);
+
+  reset();
+  after(700,play);
+})();
+</script>
+</body>
+</html>

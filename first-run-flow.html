@@ -1,0 +1,531 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Forge — First-run → first Mirror (flow)</title>
+<style>
+:root{
+  --base:#121417;--panel:#181B20;--elev:#1F242B;--hover:#1C2128;--sel:#272E36;--input:#0E1013;--code:#0E1116;
+  --b-subtle:#21252B;--b-def:#2C313A;--b-strong:#444A54;
+  --t-pri:#E6E8EB;--t-sec:#9AA0A6;--t-mut:#6B6F78;--t-code:#B8C0CC;
+  --ac:#22C55E;--ac-h:#4ADE80;--ac-br:#86EFAC;--ac-soft:#0E2818;--ac-glow:rgba(74,222,128,.35);
+  --am:#E0B24D;--am-soft:#2A2310;--ok:#6FAE8C;--warn:#C7A77B;--dng:#CC8585;--info:#88A9C4;--purple:#C49AD0;
+  --mono:"SF Mono",ui-monospace,"JetBrains Mono",Menlo,Consolas,monospace;
+  --sans:-apple-system,"Inter","Segoe UI",Roboto,sans-serif;--ease:cubic-bezier(0.2,0,0,1);
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%}
+body{background:#08090b;font-family:var(--sans);color:var(--t-pri);font-size:12px;-webkit-font-smoothing:antialiased;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;overflow:hidden;height:100vh}
+.tool-window{width:1480px;height:860px;background:var(--base);border:1px solid var(--b-def);border-radius:8px;
+  display:grid;grid-template-rows:40px 28px 1fr 26px;overflow:hidden;box-shadow:0 24px 80px rgba(0,0,0,.6)}
+.mono{font-family:var(--mono)}
+/* toolbar */
+.toolbar{display:flex;align-items:center;gap:10px;padding:0 12px;background:var(--panel);border-bottom:1px solid var(--b-subtle)}
+.glyph{width:20px;height:20px;border-radius:6px;background:linear-gradient(145deg,#22C55E,#16833f);display:flex;align-items:center;justify-content:center;font-weight:700;font-size:12px;color:#06140b;box-shadow:0 0 12px var(--ac-glow)}
+.brand{font-size:15px;font-weight:600}.brand .sub{color:var(--t-mut);font-weight:400;font-size:11px;margin-left:4px}
+.spacer{flex:1}
+.badge{font-family:var(--mono);font-size:9px;color:var(--t-mut);border:1px solid var(--b-def);border-radius:999px;padding:3px 8px}.badge b{color:var(--ac-h)}
+.livepill{display:flex;align-items:center;gap:6px;font-size:11px;color:var(--t-sec);border:1px solid var(--b-def);border-radius:999px;padding:3px 9px}
+.dot{width:7px;height:7px;border-radius:50%;background:var(--ac);box-shadow:0 0 8px var(--ac)}
+.dot.pulse{animation:breath 2.2s var(--ease) infinite}
+@keyframes breath{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.45;transform:scale(.78)}}
+/* mode strip */
+.mode{display:flex;align-items:center;gap:2px;padding:0 10px;background:var(--base);border-bottom:1px solid var(--b-subtle);position:relative}
+.m{position:relative;padding:0 12px;height:28px;line-height:28px;font-size:12px;color:var(--t-sec);transition:color .22s var(--ease)}
+.m.on{color:var(--t-pri);font-weight:500}
+.m .gaps{margin-left:6px;font-size:10px;color:var(--ac-br);background:var(--ac-soft);border-radius:999px;padding:1px 6px;opacity:0;transition:opacity .22s var(--ease)}
+.m .gaps.show{opacity:1}
+#under{position:absolute;bottom:0;height:2px;background:var(--ac);border-radius:2px;box-shadow:0 0 8px var(--ac-glow);left:12px;width:64px;transition:left .35s var(--ease),width .35s var(--ease)}
+.mode .right{margin-left:auto;font-family:var(--mono);font-size:10px;color:var(--t-mut)}.mode .right b{color:var(--ac-h)}
+/* grid */
+.main{display:grid;grid-template-columns:248px 1.35fr 320px;gap:1px;background:var(--b-subtle);overflow:hidden}
+.col{background:var(--panel);display:flex;flex-direction:column;min-height:0;overflow:hidden}
+.col.stage{background:var(--base)}
+.pane-head{height:40px;flex:0 0 40px;display:flex;align-items:center;gap:8px;padding:0 12px;border-bottom:1px solid var(--b-subtle)}
+.pane-head .ttl{font-size:13px;font-weight:600}.pane-head .meta{margin-left:auto;font-size:10px;color:var(--t-mut);font-family:var(--mono)}
+.scroll{overflow:hidden;flex:1;min-height:0}
+/* left hierarchy */
+.legend{display:flex;flex-wrap:wrap;gap:8px 12px;padding:8px 12px;font-size:9px;color:var(--t-mut);border-bottom:1px solid var(--b-subtle)}
+.legend span{display:flex;align-items:center;gap:4px}.sw{width:9px;height:9px;border-radius:2px;border:1px solid}
+.sw.ok{background:var(--ac-soft);border-color:var(--ac-br)}.sw.drift{background:var(--am-soft);border-color:var(--am)}
+.sw.broken{background:#2A1414;border-color:var(--dng)}.sw.miss{background:#241626;border-color:var(--purple);border-style:dotted}
+.row{display:flex;align-items:center;height:26px;padding-right:8px;font-size:12px;color:var(--t-sec);white-space:nowrap}
+.tw{width:14px;text-align:center;color:var(--t-mut);font-size:9px;flex:0 0 14px}
+.row .nm i{color:var(--t-mut);font-style:italic}
+.gapchip{margin-left:auto;font-family:var(--mono);font-size:9px;padding:1px 5px;border-radius:999px;border:1px solid var(--b-def);color:var(--t-mut);opacity:0;transition:opacity .3s var(--ease)}
+.gapchip.show{opacity:1}
+.gapchip.ok{color:var(--ac-br);border-color:#1c3a28}.gapchip.warn{color:var(--am);border-color:#3a3015;background:var(--am-soft)}
+.gapchip.bad{color:var(--dng);border-color:#3a1c1c;background:#1f1313}.gapchip.miss{color:var(--purple);border-style:dotted}
+.row .design-ghost{margin-left:auto;font-size:9px;color:var(--t-mut);opacity:.5;transition:opacity .3s}
+/* stage */
+.stage-head{height:40px;flex:0 0 40px;display:flex;align-items:center;gap:10px;padding:0 12px;border-bottom:1px solid var(--b-subtle)}
+.seg{display:flex;border:1px solid var(--b-def);border-radius:6px;overflow:hidden;opacity:.4;transition:opacity .3s}
+.seg.live{opacity:1}
+.seg button{background:transparent;border:0;color:var(--t-sec);font-size:11px;padding:4px 10px;border-right:1px solid var(--b-def)}
+.seg button:last-child{border-right:0}.seg button.on{background:var(--ac-soft);color:var(--ac-br)}
+.stage-head .meta{margin-left:auto;font-family:var(--mono);font-size:10px;color:var(--t-mut)}
+.stage-body{flex:1;min-height:0;position:relative;display:flex;align-items:center;justify-content:center;background:radial-gradient(120% 90% at 50% 35%,#16191e 0%,#0e1013 70%)}
+/* gap meter */
+.hud{position:absolute;background:rgba(20,23,27,.62);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);border:1px solid var(--b-def);border-radius:8px;padding:10px 12px;z-index:6}
+.hud.meter{top:18px;left:18px;min-width:150px}
+.hud.meter .lbl{font-size:9px;letter-spacing:1.4px;color:var(--t-mut)}
+.hud.meter .big{font-family:var(--mono);font-size:34px;line-height:1;color:var(--ac-br);font-weight:600;margin:3px 0 2px}
+.hud.meter .big.dim{color:var(--t-mut)}
+.hud.meter .delta{font-size:10px;color:var(--ac-h);opacity:0;transition:opacity .3s}
+.hud.meter .delta.show{opacity:1}
+.ring{height:4px;background:#23272e;border-radius:999px;margin-top:8px;overflow:hidden}
+.ring i{display:block;height:100%;width:0;background:linear-gradient(90deg,var(--ac),var(--ac-h));box-shadow:0 0 8px var(--ac-glow);transition:width .6s var(--ease)}
+.hud.heat{top:18px;right:18px;display:flex;align-items:center;gap:8px;opacity:0;transition:opacity .3s}
+.hud.heat.show{opacity:1}
+.hud.heat .pp{width:8px;height:8px;border-radius:50%;background:var(--am);box-shadow:0 0 10px var(--am);animation:flick 1s steps(2) infinite}
+@keyframes flick{50%{opacity:.5}}
+.hud.heat .txt{font-size:10px;color:var(--t-sec)}.hud.heat .txt b{font-family:var(--mono);color:var(--am)}
+/* phone */
+.phone{position:relative;width:280px;height:600px;border-radius:26px;background:#05070a;border:1px solid #2a3038;box-shadow:0 30px 70px rgba(0,0,0,.6),inset 0 0 0 6px #0c0f13;padding:6px;transition:filter .4s,transform .4s var(--ease)}
+.phone.idle{filter:saturate(.7) brightness(.82)}
+.notch{position:absolute;top:10px;left:50%;transform:translateX(-50%);width:96px;height:18px;background:#05070a;border-radius:0 0 12px 12px;z-index:5}
+.layer{position:absolute;inset:6px;border-radius:20px;overflow:hidden}
+.screen{position:absolute;inset:0;background:#0f1216;display:flex;flex-direction:column}
+.s-bar{height:22px;display:flex;align-items:center;justify-content:space-between;padding:0 14px;font-size:8px;color:#7a828c;font-family:var(--mono)}
+.s-appbar{height:44px;display:flex;align-items:center;gap:8px;padding:0 12px;border-bottom:1px solid #1b2026}
+.s-av{width:26px;height:26px;border-radius:50%;background:linear-gradient(135deg,#3a4250,#222833)}
+.s-title{font-size:11px;font-weight:600;color:#e6e8eb}.s-title .st{display:block;font-size:8px;color:#6FAE8C;font-weight:400}
+.s-appbar .s-ic{margin-left:auto;color:#6b727c;font-size:13px}
+.s-list{flex:1;padding:12px 12px 8px;display:flex;flex-direction:column;gap:10px;overflow:hidden}
+.bub{max-width:74%;padding:8px 10px;font-size:10px;line-height:1.35}
+.bub.them{align-self:flex-start;background:#1c222b;color:#cfd4da;border-radius:14px 14px 14px 4px}
+.bub.me{align-self:flex-end;background:#173a26;color:#bdf0d0;border-radius:14px 14px 4px 14px}
+.s-composer{height:44px;display:flex;align-items:center;gap:8px;padding:0 12px;border-top:1px solid #1b2026}
+.s-field{flex:1;height:26px;border-radius:14px;background:#161b21;border:1px solid #232a31}
+.s-send{width:30px;height:30px;border-radius:50%;background:var(--ac);box-shadow:0 0 10px var(--ac-glow);display:flex;align-items:center;justify-content:center;color:#06140b;font-size:13px}
+.s-fab{position:absolute;right:14px;bottom:58px;width:30px;height:30px;border-radius:50%;background:#1c222b;border:1px solid #2a323c;display:flex;align-items:center;justify-content:center;color:#8a929c;font-size:13px}
+/* design layer fades in over live */
+.l-design{z-index:4;opacity:0;transition:opacity .55s var(--ease)}
+.l-design.in{opacity:1}
+.l-live .s-title{font-size:13px}.l-live .s-title .st{color:#7a828c}
+.l-live .bub.me{border-radius:8px}.l-live .s-send{background:#2A3A30;box-shadow:none;color:#6b727c}.l-live .s-fab{display:none}
+/* seam */
+.seam{position:absolute;top:6px;bottom:6px;width:2px;background:var(--ac);box-shadow:0 0 10px var(--ac-glow);left:50%;z-index:7;opacity:0;transition:opacity .3s}
+.handle{position:absolute;width:26px;height:26px;border-radius:50%;background:#0f1316;border:2px solid var(--ac);color:var(--ac-br);display:flex;align-items:center;justify-content:center;font-size:12px;box-shadow:0 0 14px var(--ac-glow);left:calc(50% - 13px);top:280px;z-index:8;opacity:0;transform:scale(.4);transition:opacity .3s var(--ease),transform .3s var(--ease)}
+.seam.show,.handle.show{opacity:1}.handle.show{transform:scale(1)}
+.handle.nudge{animation:nudge 1.4s var(--ease) 2}
+@keyframes nudge{0%,100%{transform:scale(1) translateX(0)}25%{transform:scale(1.08) translateX(-7px)}60%{transform:scale(1.08) translateX(7px)}}
+.tagL,.tagR{position:absolute;top:6px;font-size:8px;font-family:var(--mono);letter-spacing:1px;z-index:7;padding:2px 5px;border-radius:3px;background:rgba(8,10,12,.7);opacity:0;transition:opacity .3s}
+.tagL{left:8px;color:var(--ac-br)}.tagR{right:8px;color:var(--am)}.tagL.show,.tagR.show{opacity:1}
+/* hotspots */
+.hot{position:absolute;z-index:8;border:1.5px dashed;border-radius:6px;opacity:0;transform:scale(.7);transition:opacity .3s var(--ease),transform .3s var(--ease)}
+.hot.pop{opacity:1;transform:scale(1)}
+.hot .tg{position:absolute;top:-14px;left:0;font-family:var(--mono);font-size:8px;padding:0 4px;border-radius:3px;background:rgba(8,10,12,.85)}
+.hot.am{border-color:var(--am)}.hot.am .tg{color:var(--am)}.hot.rd{border-color:var(--dng)}.hot.rd .tg{color:var(--dng)}
+.hot.pu{border-color:var(--purple);border-style:dotted}.hot.pu .tg{color:var(--purple)}
+/* drag hint */
+.hint{position:absolute;bottom:20px;left:50%;transform:translateX(-50%);font-size:11px;color:var(--ac-br);background:rgba(8,10,12,.7);border:1px solid var(--b-def);border-radius:999px;padding:5px 12px;opacity:0;transition:opacity .4s;z-index:9;backdrop-filter:blur(6px)}
+.hint.show{opacity:1}
+/* empty-state caption */
+.empty-cap{position:absolute;bottom:60px;left:50%;transform:translateX(-50%);text-align:center;font-size:12px;color:var(--t-sec);z-index:5;transition:opacity .3s}
+.empty-cap b{color:var(--ac-br)}
+/* GENERATION HUD (over stage) */
+.gen-hud{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;
+  background:rgba(10,12,14,.55);backdrop-filter:blur(3px);z-index:12;opacity:0;pointer-events:none;transition:opacity .35s var(--ease)}
+.gen-hud.show{opacity:1}
+.rail{display:flex;gap:6px}
+.rail b{font-family:var(--mono);font-size:9px;color:var(--t-mut);padding:3px 8px;border:1px solid var(--b-subtle);border-radius:4px;transition:all .25s var(--ease)}
+.rail b.done{color:var(--ok);border-color:#1d2a24}
+.rail b.now{color:var(--ac-br);border-color:#1c3a28;background:var(--ac-soft);box-shadow:0 0 12px rgba(34,197,94,.18)}
+.gen-card2{width:300px;background:rgba(20,23,27,.85);border:1px solid var(--b-def);border-radius:8px;padding:12px}
+.gen-card2 .h{font-size:11px;color:var(--t-sec);margin-bottom:8px;display:flex;align-items:center;gap:6px}
+.gen-card2 .h .sp{width:11px;height:11px;border:2px solid #2a3038;border-top-color:var(--ac);border-radius:50%;animation:spin .7s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+.plan{font-family:var(--mono);font-size:10px;line-height:1.9;color:var(--t-sec)}
+.plan div{opacity:0;transform:translateX(-6px);transition:all .25s var(--ease)}
+.plan div.in{opacity:1;transform:none}
+.plan .pk{color:var(--ac-br)}
+.files{margin-top:8px;font-family:var(--mono);font-size:10px}
+.files div{display:flex;justify-content:space-between;color:var(--ok);opacity:0;transform:translateY(6px);transition:all .25s var(--ease);padding:1px 0}
+.files div.in{opacity:1;transform:none}
+.files .add{color:var(--ac-br)}.files .ln{color:var(--t-mut)}
+/* right rail */
+.rrail{position:relative;flex:1;min-height:0}
+.panelface{position:absolute;inset:0;transition:opacity .35s var(--ease);overflow:hidden}
+.panelface.gen{padding:12px}
+.panelface.find{opacity:0;pointer-events:none;padding:0}
+.panelface.find.show{opacity:1;pointer-events:auto}
+.panelface.gen.hide{opacity:0}
+.field{display:flex;align-items:center;gap:6px;font-family:var(--mono);font-size:10px;color:var(--t-mut);background:var(--input);border:1px solid var(--b-def);border-radius:4px;padding:8px;margin-bottom:8px;transition:border-color .2s,box-shadow .2s}
+.field.focus{border-color:var(--ac);box-shadow:0 0 0 2px rgba(34,197,94,.15)}
+.field .ph{color:var(--t-mut)}.field .val{color:var(--info)}
+.field .chk{margin-left:auto;color:var(--ac-br);opacity:0;transition:opacity .25s}.field .chk.show{opacity:1}
+.field .sp{margin-left:auto;width:10px;height:10px;border:2px solid #2a3038;border-top-color:var(--ac);border-radius:50%;animation:spin .7s linear infinite;opacity:0}
+.field .sp.show{opacity:1}
+.thumb{height:0;margin-bottom:0;border-radius:6px;overflow:hidden;border:1px solid transparent;transition:all .35s var(--ease);opacity:0;background:linear-gradient(135deg,#1b2230,#12161c)}
+.thumb.show{height:86px;margin-bottom:8px;border-color:var(--b-def);opacity:1}
+.thumb .lbl{font-size:9px;color:var(--t-mut);padding:5px 7px;font-family:var(--mono)}
+.thumb .mini{display:flex;flex-direction:column;gap:4px;padding:0 8px}
+.thumb .mini .b1{height:8px;width:60%;background:#2a3340;border-radius:3px}
+.thumb .mini .b2{height:6px;width:80%;background:#222a35;border-radius:3px}
+.thumb .mini .b3{align-self:flex-end;height:10px;width:46%;background:#1d3a2a;border-radius:6px}
+.selrow{display:flex;gap:8px;margin-bottom:8px}
+.sel2{flex:1;font-size:11px;color:var(--t-pri);background:var(--input);border:1px solid var(--b-def);border-radius:4px;padding:6px 8px}.sel2 .cv{float:right;color:var(--t-mut)}
+.btn{width:100%;border:0;border-radius:6px;padding:8px;font-size:12px;font-weight:600;background:var(--ac);color:#06140b;box-shadow:0 0 12px var(--ac-glow);transition:transform .12s var(--ease),filter .2s}
+.btn.armed{animation:armpulse 1.4s var(--ease) infinite}
+@keyframes armpulse{0%,100%{box-shadow:0 0 12px var(--ac-glow)}50%{box-shadow:0 0 22px var(--ac-glow)}}
+.kbd{font-family:var(--mono);font-size:10px;color:var(--t-mut);text-align:center;margin-top:8px}
+.kbd b{color:var(--t-sec)}
+/* findings (right, after) */
+.findings-h{padding:10px 12px 6px;font-size:10px;color:var(--t-mut);letter-spacing:.4px;text-transform:uppercase}
+.find{margin:0 12px 8px;border:1px solid var(--b-def);border-radius:6px;background:var(--panel);overflow:hidden;opacity:0;transform:translateY(8px);transition:all .3s var(--ease)}
+.find.in{opacity:1;transform:none}
+.find .fh{display:flex;align-items:center;gap:8px;padding:8px 10px}
+.find .fh .fd{width:7px;height:7px;border-radius:50%;flex:0 0 7px}
+.find.rd .fd{background:var(--dng)}.find.am .fd{background:var(--am)}.find.pu .fd{background:var(--purple)}
+.find .fh .ft{font-size:11px;color:var(--t-pri)}.find .fh .fl{margin-left:auto;font-family:var(--mono);font-size:9px;color:var(--t-mut)}
+/* status bar */
+.statusbar{display:flex;align-items:center;gap:16px;padding:0 12px;background:var(--panel);border-top:1px solid var(--b-subtle);font-size:10px;color:var(--t-mut);font-family:var(--mono)}
+.statusbar b{color:var(--ac-br)}.statusbar .s-ok{color:var(--ok)}.statusbar .sp{margin-left:auto}
+.statusbar .fade{opacity:0;transition:opacity .3s}.statusbar .fade.show{opacity:1}
+/* director bar */
+.director{width:1480px;display:flex;align-items:center;gap:14px;padding:10px 14px;background:#0e1014;border:1px solid var(--b-def);border-radius:8px}
+.director .play{background:var(--ac);color:#06140b;border:0;border-radius:6px;padding:7px 16px;font-weight:600;font-size:12px;cursor:pointer}
+.director .play:hover{background:var(--ac-h)}
+.director .replay{background:transparent;border:1px solid var(--b-def);color:var(--t-sec);border-radius:6px;padding:7px 12px;cursor:pointer;font-size:12px}
+.beats{display:flex;gap:6px;margin-left:8px}
+.beat{display:flex;align-items:center;gap:7px;font-size:11px;color:var(--t-mut);cursor:pointer;padding:4px 8px;border-radius:999px;transition:all .2s}
+.beat .bd{width:7px;height:7px;border-radius:50%;background:#2c3640;transition:all .2s}
+.beat.on{color:var(--ac-br);background:var(--ac-soft)}.beat.on .bd{background:var(--ac);box-shadow:0 0 8px var(--ac-glow)}
+.beat.done .bd{background:var(--ok)}
+.director .cap{margin-left:auto;font-family:var(--mono);font-size:10px;color:var(--t-sec)}
+</style>
+</head>
+<body>
+<div class="tool-window" id="tw">
+  <div class="toolbar">
+    <div class="glyph">F</div><div class="brand">Forge<span class="sub">· D2C · live inspector</span></div>
+    <div class="spacer"></div>
+    <div class="badge">d2c-engine ⇆ stdio · <b>live view-tree bridge</b></div>
+    <div class="livepill"><span class="dot pulse"></span> Pixel 8 · API 34 · live</div>
+  </div>
+
+  <div class="mode">
+    <div class="m on" id="mGen">Generate</div>
+    <div class="m" id="mMir">Mirror<span class="gaps" id="mGaps">7 gaps</span></div>
+    <div class="m" id="mEval">Eval &amp; History</div>
+    <div id="under"></div>
+    <div class="right" id="modeRight">connect a Figma frame to begin</div>
+  </div>
+
+  <div class="main">
+    <!-- LEFT -->
+    <div class="col">
+      <div class="pane-head"><span class="ttl">Hierarchy</span><span class="meta" id="hMeta">live only</span></div>
+      <div class="legend">
+        <span><i class="sw ok"></i>matched</span><span><i class="sw drift"></i>drift</span>
+        <span><i class="sw broken"></i>broken</span><span><i class="sw miss"></i>missing</span>
+      </div>
+      <div class="scroll" id="tree">
+        <div class="row" style="padding-left:6px"><span class="tw">▾</span><span class="nm">ChatThreadScreen</span><span class="gapchip ok" data-c>91%</span></div>
+        <div class="row" style="padding-left:24px"><span class="tw">▾</span><span class="nm">TopAppBar</span><span class="gapchip warn" data-c>82%</span></div>
+        <div class="row" style="padding-left:42px"><span class="tw">·</span><span class="nm">Text "Aria Chen"</span><span class="gapchip warn" data-c>font</span></div>
+        <div class="row" style="padding-left:42px"><span class="tw">·</span><span class="nm">Image avatar</span><span class="gapchip ok" data-c>ok</span></div>
+        <div class="row" style="padding-left:24px"><span class="tw">▾</span><span class="nm">LazyColumn messages</span><span class="gapchip ok" data-c>94%</span></div>
+        <div class="row" style="padding-left:42px"><span class="tw">·</span><span class="nm">Bubble (them)</span><span class="gapchip ok" data-c>96%</span></div>
+        <div class="row" style="padding-left:42px"><span class="tw">·</span><span class="nm">Bubble (me)</span><span class="gapchip bad" data-c>corner</span></div>
+        <div class="row" style="padding-left:24px"><span class="tw">▾</span><span class="nm">Composer Row</span><span class="gapchip warn" data-c>79%</span></div>
+        <div class="row" style="padding-left:42px"><span class="tw">·</span><span class="nm">SendButton</span><span class="gapchip bad" data-c>color</span></div>
+        <div class="row" style="padding-left:42px"><span class="tw">·</span><span class="nm"><i>ScrollToBottom FAB</i></span><span class="gapchip miss" data-c>missing</span></div>
+      </div>
+    </div>
+
+    <!-- CENTER STAGE -->
+    <div class="col stage">
+      <div class="stage-head">
+        <div class="seg" id="seg"><button class="on">Swipe</button><button>Onion</button><button>Side-by-side</button><button>Diff-heat</button></div>
+        <div class="meta" id="stageMeta">Pixel 8 · live · waiting for a design</div>
+      </div>
+      <div class="stage-body">
+        <div class="hud meter"><div class="lbl">MIRROR GAP</div><div class="big dim" id="gapNum">—</div>
+          <div class="delta" id="gapDelta">▾ first mirror</div><div class="ring"><i id="gapRing"></i></div></div>
+        <div class="hud heat" id="heat"><span class="pp"></span><span class="txt">live recompose <b id="recomp">49</b> / s</span></div>
+
+        <div class="empty-cap" id="emptyCap">Your live app is here. <b>Paste a Figma frame →</b> to mirror your design against it.</div>
+
+        <div class="phone idle" id="phone">
+          <div class="notch"></div>
+          <!-- live layer (always present — the inspector already holds the device) -->
+          <div class="layer l-live">
+            <div class="screen">
+              <div class="s-bar"><span>9:41</span><span>▮▮ ▾ ▰</span></div>
+              <div class="s-appbar"><div class="s-av"></div><div class="s-title">Aria Chen<span class="st">online</span></div><div class="s-ic">⋮</div></div>
+              <div class="s-list"><div class="bub them">Hey! are we still on for the design review?</div><div class="bub me">yes — pushing the build now 🚀</div><div class="bub them">love it. ping me when it's up</div></div>
+              <div class="s-composer"><div class="s-field"></div><div class="s-send">➤</div></div>
+            </div>
+          </div>
+          <!-- design layer (fades in) -->
+          <div class="layer l-design" id="design">
+            <div class="screen">
+              <div class="s-bar"><span>9:41</span><span>▮▮ ▾ ▰</span></div>
+              <div class="s-appbar"><div class="s-av"></div><div class="s-title">Aria Chen<span class="st">online</span></div><div class="s-ic">⋮</div></div>
+              <div class="s-list"><div class="bub them">Hey! are we still on for the design review?</div><div class="bub me">yes — pushing the build now 🚀</div><div class="bub them">love it. ping me when it's up</div></div>
+              <div class="s-composer"><div class="s-field"></div><div class="s-send">➤</div></div>
+              <div class="s-fab">▾</div>
+            </div>
+          </div>
+          <div class="tagL" id="tagL">DESIGN</div><div class="tagR" id="tagR">LIVE APP</div>
+          <div class="seam" id="seam"></div><div class="handle" id="handle">⇄</div>
+          <div class="hot am" id="hA" style="top:54px;left:64px;width:120px;height:20px"><span class="tg">A · font</span></div>
+          <div class="hot rd" id="hB" style="top:150px;left:78px;width:130px;height:34px"><span class="tg">B · corner</span></div>
+          <div class="hot rd" id="hC" style="bottom:60px;right:18px;width:34px;height:34px"><span class="tg">C · color</span></div>
+          <div class="hot pu" id="hD" style="bottom:96px;right:16px;width:36px;height:36px"><span class="tg">D · missing</span></div>
+          <div class="hint" id="hint">drag the seam to compare ⇄</div>
+        </div>
+
+        <!-- GENERATION HUD -->
+        <div class="gen-hud" id="genHud">
+          <div class="rail" id="rail"><b id="r0">parse</b><b id="r1">tree</b><b id="r2">generate</b><b id="r3">render</b><b id="r4">diff vs live</b></div>
+          <div class="gen-card2">
+            <div class="h"><span class="sp" id="genSp"></span><span id="genH">Parsing 38 nodes…</span></div>
+            <div class="plan" id="plan">
+              <div><span class="pk">✓</span> Scaffold ChatThreadScreen()</div>
+              <div><span class="pk">✓</span> Header → AppTopBar + avatar</div>
+              <div><span class="pk">◌</span> Message list → LazyColumn</div>
+              <div><span class="pk">▢</span> Composer → Row + TextField</div>
+            </div>
+            <div class="files" id="files">
+              <div><span class="add">+ chat/D2C.kt</span><span class="ln">+148</span></div>
+              <div><span class="add">+ chat/MessageBubble.kt</span><span class="ln">+44</span></div>
+              <div><span class="add">+ chat/Composer.kt</span><span class="ln">+37</span></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="stage-foot" style="height:34px;flex:0 0 34px;display:flex;align-items:center;gap:12px;padding:0 12px;border-top:1px solid var(--b-subtle)">
+        <span style="font-size:10px;color:var(--t-mut)" id="footHint">sandbox: sandbox · builds locally in seconds</span>
+      </div>
+    </div>
+
+    <!-- RIGHT -->
+    <div class="col">
+      <div class="pane-head"><span class="ttl" id="rTtl">Generate</span><span class="meta" id="rMeta">paste a frame</span></div>
+      <div class="rrail">
+        <div class="panelface gen" id="genFace">
+          <div class="field" id="figField"><span class="ph" id="figPh">https://figma.com/design/…</span><span class="val" id="figVal" style="display:none"></span><span class="sp" id="figSp"></span><span class="chk" id="figChk">✓</span></div>
+          <div class="thumb" id="thumb"><div class="lbl">Chat · 421-12 · 390×844</div><div class="mini"><div class="b1"></div><div class="b2"></div><div class="b3"></div></div></div>
+          <div class="selrow"><div class="sel2">Material 3<span class="cv">▾</span></div><div class="sel2">Compose<span class="cv">▾</span></div></div>
+          <button class="btn" id="genBtn">Generate → Mirror</button>
+          <div class="kbd">or press <b>⌘↵</b></div>
+        </div>
+        <div class="panelface find" id="findFace">
+          <div class="findings-h">Findings · ranked by gap × recompose</div>
+          <div class="find rd" id="f1"><div class="fh"><span class="fd"></span><span class="ft">Send button color is unbound</span><span class="fl">↻7/s</span></div></div>
+          <div class="find rd" id="f2"><div class="fh"><span class="fd"></span><span class="ft">Me-bubble corner radius</span><span class="fl">14→8dp</span></div></div>
+          <div class="find am" id="f3"><div class="fh"><span class="fd"></span><span class="ft">Title font size drift</span><span class="fl">11→13sp</span></div></div>
+          <div class="find pu" id="f4"><div class="fh"><span class="fd"></span><span class="ft">Scroll-to-bottom FAB missing</span><span class="fl">in design</span></div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="statusbar">
+    <span class="s-ok" id="stEngine">● local engine offline-mode</span>
+    <span class="fade" id="stRender">render: <b>Roborazzi UT 0.8s</b></span>
+    <span class="fade" id="stFid">fidelity: <b>91%</b></span>
+    <span class="fade" id="stQual">code quality: <b>87%</b></span>
+    <span class="sp" id="stLast">device connected · live</span>
+  </div>
+</div>
+
+<div class="director">
+  <button class="play" id="playBtn">▶ Play first-run</button>
+  <button class="replay" id="replayBtn">⟲ Reset</button>
+  <div class="beats" id="beats">
+    <div class="beat" data-s="0"><span class="bd"></span>Empty</div>
+    <div class="beat" data-s="1"><span class="bd"></span>Paste</div>
+    <div class="beat" data-s="2"><span class="bd"></span>Generate</div>
+    <div class="beat" data-s="3"><span class="bd"></span>Build</div>
+    <div class="beat" data-s="4"><span class="bd"></span>Transition</div>
+    <div class="beat" data-s="5"><span class="bd"></span>Mirror</div>
+  </div>
+  <div class="cap" id="dirCap">paste → generate → build locally → mirror your real app</div>
+</div>
+
+<script>
+(function(){
+  var $=function(id){return document.getElementById(id);};
+  var timers=[], step=-1, playing=false;
+  function after(ms,fn){var t=setTimeout(fn,ms);timers.push(t);return t;}
+  function clearAll(){timers.forEach(clearTimeout);timers=[];}
+
+  var FIG="https://figma.com/design/8xK…/Chat?node-id=421-12";
+  function setBeat(n){[].forEach.call($('beats').children,function(b){var s=+b.dataset.s;b.classList.toggle('on',s===n);b.classList.toggle('done',s<n);});}
+  function cap(t){$('dirCap').textContent=t;}
+
+  // counts the gap up
+  function countGap(to,ms){
+    var from=0,t0=performance.now();$('gapNum').classList.remove('dim');
+    (function f(now){var k=Math.min(1,(now-t0)/ms);var v=from+(to-from)*k;$('gapNum').textContent=Math.round(v)+'%';
+      $('gapRing').style.width=(100-v)+'%';if(k<1)requestAnimationFrame(f);})(t0);
+  }
+
+  // ---------- STATE SETTERS (idempotent, for scrub) ----------
+  function reset(){
+    clearAll();playing=false;
+    $('phone').classList.add('idle');
+    $('design').classList.remove('in');
+    $('genHud').classList.remove('show');
+    $('seam').classList.remove('show');$('handle').classList.remove('show','nudge');
+    $('tagL').classList.remove('show');$('tagR').classList.remove('show');
+    ['hA','hB','hC','hD'].forEach(function(id){$(id).classList.remove('pop');});
+    $('hint').classList.remove('show');
+    $('emptyCap').style.opacity='1';
+    $('gapNum').textContent='—';$('gapNum').classList.add('dim');$('gapRing').style.width='0';
+    $('gapDelta').classList.remove('show');$('heat').classList.remove('show');
+    $('mGaps').classList.remove('show');
+    $('under').style.left='12px';$('under').style.width='64px';
+    $('mGen').classList.add('on');$('mMir').classList.remove('on');
+    $('modeRight').textContent='connect a Figma frame to begin';
+    $('hMeta').textContent='live only';$('stageMeta').textContent='Pixel 8 · live · waiting for a design';
+    $('seg').classList.remove('live');
+    [].forEach.call($('tree').querySelectorAll('[data-c]'),function(c){c.classList.remove('show');});
+    // right rail
+    $('genFace').classList.remove('hide');$('findFace').classList.remove('show');
+    $('rTtl').textContent='Generate';$('rMeta').textContent='paste a frame';
+    $('figField').classList.remove('focus');$('figPh').style.display='';$('figVal').style.display='none';$('figVal').textContent='';
+    $('figSp').classList.remove('show');$('figChk').classList.remove('show');
+    $('thumb').classList.remove('show');$('genBtn').classList.remove('armed');
+    ['f1','f2','f3','f4'].forEach(function(id){$(id).classList.remove('in');});
+    ['stRender','stFid','stQual'].forEach(function(id){$(id).classList.remove('show');});
+    $('stLast').textContent='device connected · live';
+    $('footHint').textContent='sandbox: sandbox · builds locally in seconds';
+    // gen hud internals
+    ['r0','r1','r2','r3','r4'].forEach(function(id){$(id).className='';});
+    [].forEach.call($('plan').children,function(d){d.classList.remove('in');});
+    [].forEach.call($('files').children,function(d){d.classList.remove('in');});
+    step=-1;setBeat(0);cap('paste → generate → build locally → mirror your real app');
+  }
+
+  // ---------- PLAY (animated) ----------
+  function play(){
+    reset();playing=true;var T=0;var seq=function(ms,fn){after(T+=ms,fn);};
+    // beat 0: empty (already)
+    setBeat(0);cap('① Your live app is already here — the inspector holds the device.');
+    // beat 1: paste
+    seq(900,function(){setBeat(1);cap('② Paste a Figma frame — inline validate, no modal.');
+      $('figField').classList.add('focus');$('figPh').style.display='none';$('figVal').style.display='';
+      var i=0;(function type(){if(i<=FIG.length){$('figVal').textContent=FIG.slice(0,i++);after(14,type);}else{
+        $('figSp').classList.add('show');}})();
+    });
+    seq(1500,function(){$('figSp').classList.remove('show');$('figChk').classList.add('show');$('thumb').classList.add('show');
+      $('rMeta').textContent='frame ready';$('genBtn').classList.add('armed');});
+    // beat 2: generate
+    seq(1100,function(){setBeat(2);cap('③ Generate → the agent writes an editable plan; files land in the sandbox.');
+      $('genBtn').classList.remove('armed');$('phone').classList.remove('idle');
+      $('genHud').classList.add('show');$('genSp').style.opacity='1';
+      $('r0').className='now';$('emptyCap').style.opacity='0';
+    });
+    seq(550,function(){$('r0').className='done';$('r1').className='now';$('genH').textContent='Building view tree…';
+      var p=$('plan').children;[].forEach.call(p,function(d,i){after(i*160,function(){d.classList.add('in');});});});
+    seq(900,function(){$('r1').className='done';$('r2').className='now';$('genH').textContent='Generating Compose…';
+      var f=$('files').children;[].forEach.call(f,function(d,i){after(i*260,function(){d.classList.add('in');});});});
+    // beat 3: build
+    seq(1100,function(){setBeat(3);cap('④ Codegen done → the sandbox compiles in the background. No spinner-stare.');
+      $('r2').className='done';$('r3').className='now';$('genH').textContent='./gradlew assembleDebug · sandbox';
+      $('footHint').textContent='compiling sandbox… (seconds, not remote minutes)';});
+    seq(1200,function(){$('genH').textContent='✓ compiled · rendering (Roborazzi UT) 0.8s';$('r3').className='done';$('r4').className='now';});
+    // beat 4: transition
+    seq(1000,function(){setBeat(4);cap('⑤ The wow: design fades in OVER your live app. The Gap counts up. You did nothing.');
+      $('genHud').classList.remove('show');
+      $('design').classList.add('in');
+      $('under').style.left='62px';$('under').style.width='52px'; // slide underline to Mirror
+      $('mGen').classList.remove('on');$('mMir').classList.add('on');$('mGaps').classList.add('show');
+      $('modeRight').innerHTML='screen: <b>ChatThreadScreen</b> · auto-diff on save';
+      $('hMeta').textContent='design ⇄ live';$('stageMeta').textContent='1080×2400 · 420dpi · status/nav cropped';
+      $('rTtl').textContent='Gap Inspector';$('rMeta').textContent='tap a hotspot';
+      $('seg').classList.add('live');
+    });
+    seq(500,function(){countGap(9,650);$('gapDelta').classList.add('show');$('heat').classList.add('show');
+      // tree design-side fills
+      var chips=$('tree').querySelectorAll('[data-c]');[].forEach.call(chips,function(c,i){after(i*70,function(){c.classList.add('show');});});
+      // right rail swap to findings
+      $('genFace').classList.add('hide');$('findFace').classList.add('show');
+      ['f1','f2','f3','f4'].forEach(function(id,i){after(120+i*110,function(){$(id).classList.add('in');});});
+      // status bar fills
+      ['stRender','stFid','stQual'].forEach(function(id,i){after(300+i*120,function(){$(id).classList.add('show');});});
+      $('stLast').textContent='first diff · just now';
+    });
+    seq(700,function(){
+      // hotspots stagger in
+      ['hA','hB','hC','hD'].forEach(function(id,i){after(i*130,function(){$(id).classList.add('pop');});});
+    });
+    seq(700,function(){
+      $('seam').classList.add('show');$('handle').classList.add('show');$('tagL').classList.add('show');$('tagR').classList.add('show');
+    });
+    // beat 5: mirror
+    seq(700,function(){setBeat(5);cap("⑥ You're in the Mirror — drag to compare, fix the gap, accept to your real module.");
+      $('footHint').textContent='sandbox ready · accept writes into your real module';
+      $('handle').classList.add('nudge');after(700,function(){$('hint').classList.add('show');
+        after(2600,function(){$('hint').classList.remove('show');});});
+      playing=false;
+    });
+  }
+
+  // jump (instant) — replays from start to keep it simple & smooth
+  $('beats').addEventListener('click',function(e){var b=e.target.closest('.beat');if(!b)return;play();});
+  $('playBtn').addEventListener('click',play);
+  $('replayBtn').addEventListener('click',reset);
+
+  // recompose ambient
+  setInterval(function(){if($('heat').classList.contains('show'))$('recomp').textContent=String(38+Math.floor(Math.random()*18));},900);
+
+  // seam drag once in mirror
+  var phone=$('phone'),seam=$('seam'),handle=$('handle'),design=$('design'),drag=false;
+  function pct(e){var r=phone.getBoundingClientRect();return Math.max(2,Math.min(98,(e.clientX-r.left)/r.width*100));}
+  function setSeam(p){design.style.clipPath='inset(0 0 0 0)';design.style.clipPath='inset(0 '+(100-p)+'% 0 0)';
+    seam.style.left=p+'%';handle.style.left='calc('+p+'% - 13px)';}
+  function dn(e){if(!seam.classList.contains('show'))return;drag=true;handle.classList.remove('nudge');$('hint').classList.remove('show');e.preventDefault();}
+  handle.addEventListener('mousedown',dn);seam.addEventListener('mousedown',dn);
+  window.addEventListener('mousemove',function(e){if(drag)setSeam(pct(e));});
+  window.addEventListener('mouseup',function(){drag=false;});
+
+  // deterministic per-beat state setter (for step-by-step capture)
+  window.gotoBeat=function(n){
+    clearAll();reset();setBeat(n);
+    if(n>=1){$('figField').classList.add('focus');$('figPh').style.display='none';$('figVal').style.display='';$('figVal').textContent=FIG;
+      $('figChk').classList.add('show');$('thumb').classList.add('show');$('rMeta').textContent='frame ready';$('genBtn').classList.add('armed');
+      cap('② Paste a Figma frame — inline validate, no modal.');}
+    if(n>=2){$('genBtn').classList.remove('armed');$('phone').classList.remove('idle');$('emptyCap').style.opacity='0';
+      $('genHud').classList.add('show');$('genSp').style.opacity='1';$('genH').textContent='Generating Compose…';
+      $('r0').className='done';$('r1').className='done';$('r2').className='now';
+      [].forEach.call($('plan').children,function(d){d.classList.add('in');});
+      [].forEach.call($('files').children,function(d){d.classList.add('in');});
+      cap('③ Generate → editable plan; files land in the sandbox.');}
+    if(n>=3){$('genH').textContent='✓ compiled · rendering (Roborazzi UT) 0.8s';$('r2').className='done';$('r3').className='done';$('r4').className='now';
+      $('footHint').textContent='compiling sandbox… (seconds, not remote minutes)';
+      cap('④ Codegen done → sandbox compiles in the background. No spinner-stare.');}
+    if(n>=4){$('genHud').classList.remove('show');$('design').classList.add('in');
+      $('under').style.left='62px';$('under').style.width='52px';
+      $('mGen').classList.remove('on');$('mMir').classList.add('on');$('mGaps').classList.add('show');
+      $('modeRight').innerHTML='screen: <b>ChatThreadScreen</b> · auto-diff on save';
+      $('hMeta').textContent='design ⇄ live';$('stageMeta').textContent='1080×2400 · 420dpi · status/nav cropped';
+      $('rTtl').textContent='Gap Inspector';$('rMeta').textContent='tap a hotspot';$('seg').classList.add('live');
+      $('gapNum').textContent='9%';$('gapNum').classList.remove('dim');$('gapRing').style.width='91%';
+      $('gapDelta').classList.add('show');$('heat').classList.add('show');
+      [].forEach.call($('tree').querySelectorAll('[data-c]'),function(c){c.classList.add('show');});
+      $('genFace').classList.add('hide');$('findFace').classList.add('show');
+      ['f1','f2','f3','f4'].forEach(function(id){$(id).classList.add('in');});
+      ['stRender','stFid','stQual'].forEach(function(id){$(id).classList.add('show');});
+      $('stLast').textContent='first diff · just now';
+      ['hA','hB','hC','hD'].forEach(function(id){$(id).classList.add('pop');});
+      $('seam').classList.add('show');$('handle').classList.add('show');$('tagL').classList.add('show');$('tagR').classList.add('show');
+      cap('⑤ The wow: design fades in OVER your live app. Gap counts up.');}
+    if(n>=5){$('footHint').textContent='sandbox ready · accept writes into your real module';
+      $('hint').classList.add('show');$('handle').classList.add('nudge');
+      cap("⑥ You're in the Mirror — drag to compare, fix the gap, accept to your real module.");}
+  };
+
+  reset();
+  after(700,play); // autoplay
+})();
+</script>
+</body>
+</html>

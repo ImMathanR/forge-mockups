@@ -1,0 +1,296 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Forge — Generate cockpit</title>
+<style>
+:root{
+  --base:#121417;--panel:#181B20;--elev:#1F242B;--hover:#1C2128;--sel:#272E36;--input:#0E1013;--code:#0E1116;
+  --b-subtle:#21252B;--b-def:#2C313A;--b-strong:#444A54;
+  --t-pri:#E6E8EB;--t-sec:#9AA0A6;--t-mut:#6B6F78;--t-code:#B8C0CC;
+  --ac:#22C55E;--ac-h:#4ADE80;--ac-br:#86EFAC;--ac-soft:#0E2818;--ac-glow:rgba(74,222,128,.35);
+  --am:#E0B24D;--am-soft:#2A2310;--ok:#6FAE8C;--warn:#C7A77B;--dng:#CC8585;--info:#88A9C4;--purple:#C49AD0;
+  --mono:"SF Mono",ui-monospace,"JetBrains Mono",Menlo,Consolas,monospace;--sans:-apple-system,"Inter","Segoe UI",Roboto,sans-serif;--ease:cubic-bezier(0.2,0,0,1);
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%}
+body{background:#08090b;font-family:var(--sans);color:var(--t-pri);font-size:12px;-webkit-font-smoothing:antialiased;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;overflow:hidden;height:100vh}
+.tool-window{width:1480px;height:860px;background:var(--base);border:1px solid var(--b-def);border-radius:8px;display:grid;grid-template-rows:40px 28px 1fr 26px;overflow:hidden;box-shadow:0 24px 80px rgba(0,0,0,.6)}
+.mono{font-family:var(--mono)}
+.toolbar{display:flex;align-items:center;gap:10px;padding:0 12px;background:var(--panel);border-bottom:1px solid var(--b-subtle)}
+.glyph{width:20px;height:20px;border-radius:6px;background:linear-gradient(145deg,#22C55E,#16833f);display:flex;align-items:center;justify-content:center;font-weight:700;font-size:12px;color:#06140b;box-shadow:0 0 12px var(--ac-glow)}
+.brand{font-size:15px;font-weight:600}.brand .sub{color:var(--t-mut);font-weight:400;font-size:11px;margin-left:4px}
+.spacer{flex:1}
+.badge{font-family:var(--mono);font-size:9px;color:var(--t-mut);border:1px solid var(--b-def);border-radius:999px;padding:3px 8px}.badge b{color:var(--ac-h)}
+.livepill{display:flex;align-items:center;gap:6px;font-size:11px;color:var(--t-sec);border:1px solid var(--b-def);border-radius:999px;padding:3px 9px}
+.dot{width:7px;height:7px;border-radius:50%;background:var(--ac);box-shadow:0 0 8px var(--ac)}.dot.pulse{animation:breath 2.2s var(--ease) infinite}
+@keyframes breath{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.45;transform:scale(.78)}}
+.mode{display:flex;align-items:center;gap:2px;padding:0 10px;background:var(--base);border-bottom:1px solid var(--b-subtle)}
+.m{position:relative;padding:0 12px;height:28px;line-height:28px;font-size:12px;color:var(--t-sec)}
+.m.on{color:var(--t-pri);font-weight:500}.m.on .under{position:absolute;left:8px;right:8px;bottom:0;height:2px;background:var(--ac);border-radius:2px;box-shadow:0 0 8px var(--ac-glow)}
+.m .badge2{margin-left:6px;font-size:10px;color:var(--ac-br);background:var(--ac-soft);border-radius:999px;padding:1px 6px}
+.mode .right{margin-left:auto;font-family:var(--mono);font-size:10px;color:var(--t-mut)}.mode .right b{color:var(--ac-h)}
+.main{display:grid;grid-template-columns:228px 1fr 326px;gap:1px;background:var(--b-subtle);overflow:hidden;min-height:0}
+.col{background:var(--panel);display:flex;flex-direction:column;min-height:0;overflow:hidden}.col.center{background:var(--base)}
+.ph{height:40px;flex:0 0 40px;display:flex;align-items:center;gap:8px;padding:0 12px;border-bottom:1px solid var(--b-subtle)}
+.ph .ttl{font-size:13px;font-weight:600}.ph .meta{margin-left:auto;font-size:10px;color:var(--t-mut);font-family:var(--mono)}
+.scroll{overflow:hidden;flex:1;min-height:0}
+/* left recents */
+.grp{font-size:9px;letter-spacing:.6px;text-transform:uppercase;color:var(--t-mut);padding:10px 12px 4px}
+.rrow{display:flex;align-items:center;gap:8px;height:30px;padding:0 12px;font-size:12px;color:var(--t-sec);cursor:pointer;border-left:2px solid transparent}
+.rrow:hover{background:var(--hover)}.rrow.on{background:var(--sel);border-left-color:var(--ac);color:var(--t-pri)}
+.rrow .ic{width:18px;height:18px;border-radius:4px;background:#222833;flex:0 0 18px}
+.rrow .mut{margin-left:auto;font-family:var(--mono);font-size:9px;color:var(--t-mut)}
+/* center timeline */
+.tl{flex:1;min-height:0;overflow:hidden;padding:14px 16px 0;display:flex;flex-direction:column;gap:12px}
+.turn{display:flex;gap:10px}
+.av{width:24px;height:24px;border-radius:6px;flex:0 0 24px;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700}
+.av.user{background:#222833;color:#9aa0a6}.av.agent{background:linear-gradient(145deg,#22C55E,#16833f);color:#06140b;box-shadow:0 0 8px var(--ac-glow)}
+.tc{flex:1;min-width:0}
+.who{font-size:10px;color:var(--t-mut);margin-bottom:4px}.who b{color:var(--t-sec)}.who .tag{color:var(--ac-h);font-family:var(--mono);font-size:9px;border:1px solid #1c3a28;border-radius:999px;padding:0 6px;margin-left:6px}
+.bubble{background:var(--panel);border:1px solid var(--b-subtle);border-radius:8px;padding:9px 11px;font-size:12px;color:var(--t-pri);line-height:1.5}
+.bubble.user{background:var(--elev)}
+.bubble .lk{color:var(--info)}
+.reason{margin-top:8px;font-size:11px;color:var(--t-sec)}
+.reason .rh{cursor:pointer;color:var(--t-mut);font-family:var(--mono);font-size:10px}
+.reason .rb{display:none;margin-top:6px;font-family:var(--mono);font-size:10px;color:var(--t-mut);line-height:1.6;border-left:2px solid var(--b-def);padding-left:9px}
+.reason.open .rb{display:block}
+/* plan card */
+.plan{margin-top:9px;border:1px solid var(--b-def);border-radius:8px;background:var(--code);overflow:hidden}
+.plan .pt{display:flex;align-items:center;padding:7px 10px;font-size:10px;color:var(--t-mut);border-bottom:1px solid var(--b-subtle);font-family:var(--mono)}
+.plan .pt .e{margin-left:auto;color:var(--t-sec)}
+.pstep{display:flex;align-items:center;gap:9px;padding:7px 10px;font-size:11px;color:var(--t-pri);border-bottom:1px solid #181d22}
+.pstep:last-child{border-bottom:0}
+.pstep .sd{width:13px;height:13px;border-radius:50%;flex:0 0 13px;display:flex;align-items:center;justify-content:center;font-size:9px}
+.pstep.done .sd{background:var(--ac-soft);color:var(--ac-br);border:1px solid #1c3a28}
+.pstep.queued .sd{border:1px solid var(--b-strong);color:var(--t-mut)}
+.pstep.run .sd{border:2px solid #2a3038;border-top-color:var(--ac);animation:spin .7s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+.pstep.edited{background:var(--am-soft)}.pstep.edited .sd{border:1px solid #3a3015;color:var(--am)}
+.pstep .pe{margin-left:auto;font-family:var(--mono);font-size:9px;color:var(--am);opacity:0}
+.pstep.edited .pe{opacity:1}
+.pstep.add{color:var(--t-mut);font-style:italic}
+.pstep .ed{outline:none}.pstep.editing .ed{background:#0c0f13;border:1px solid var(--ac);border-radius:4px;padding:1px 6px;box-shadow:0 0 0 2px rgba(34,197,94,.12)}
+/* pipeline rail */
+.prail{display:flex;gap:5px;padding:9px 16px;border-top:1px solid var(--b-subtle)}
+.prail b{font-family:var(--mono);font-size:9px;color:var(--t-mut);padding:3px 8px;border:1px solid var(--b-subtle);border-radius:4px}
+.prail b.done{color:var(--ok);border-color:#1d2a24}.prail b.now{color:var(--ac-br);border-color:#1c3a28;background:var(--ac-soft);box-shadow:0 0 10px rgba(34,197,94,.15)}
+/* file rows */
+.files{margin-top:9px;display:flex;flex-direction:column;gap:0}
+.fr{display:flex;align-items:center;gap:8px;padding:5px 10px;font-family:var(--mono);font-size:11px;border:1px solid var(--b-subtle);border-top:0;background:var(--panel);cursor:pointer;opacity:0;transform:translateY(6px);transition:all .25s var(--ease)}
+.fr:first-child{border-top:1px solid var(--b-subtle);border-radius:6px 6px 0 0}.fr:last-child{border-radius:0 0 6px 6px}
+.fr.in{opacity:1;transform:none}.fr:hover{background:var(--hover)}
+.fr .add{color:var(--ac-br)}.fr .ln{margin-left:auto;color:var(--t-mut)}.fr .fid{color:var(--ok);font-size:9px}
+/* composer */
+.composer{border-top:1px solid var(--b-subtle);padding:10px 16px}
+.ctabs{display:flex;gap:4px;margin-bottom:8px}
+.ctab{font-size:10px;color:var(--t-sec);border:1px solid var(--b-def);border-radius:5px;padding:3px 9px;cursor:pointer}.ctab.on{background:var(--ac-soft);color:var(--ac-br);border-color:#1c3a28}
+.cbox{background:var(--input);border:1px solid var(--b-def);border-radius:7px;padding:9px 11px;font-size:12px;color:var(--t-mut);display:flex;align-items:center}
+.cbox .send{margin-left:auto;width:24px;height:24px;border-radius:5px;background:var(--ac);color:#06140b;display:flex;align-items:center;justify-content:center;font-size:12px;box-shadow:0 0 8px var(--ac-glow)}
+.chips{display:flex;gap:6px;margin-top:8px}
+.qchip{font-size:10px;color:var(--t-sec);border:1px solid var(--b-def);border-radius:999px;padding:3px 9px;cursor:pointer}.qchip:hover{background:var(--hover);color:var(--t-pri)}
+/* right */
+.gcard{margin:12px;padding:11px;border:1px solid var(--b-def);border-radius:8px;background:var(--elev)}
+.figrow{display:flex;align-items:center;gap:6px;font-family:var(--mono);font-size:10px;color:var(--info);background:var(--input);border:1px solid var(--b-def);border-radius:5px;padding:6px 8px;margin-bottom:8px}
+.selrow{display:flex;gap:8px;margin-bottom:8px}.sel2{flex:1;font-size:11px;color:var(--t-pri);background:var(--input);border:1px solid var(--b-def);border-radius:5px;padding:6px 8px}.sel2 .cv{float:right;color:var(--t-mut)}
+.btn{width:100%;border:0;border-radius:6px;padding:8px;font-size:12px;font-weight:600;background:var(--ac);color:#06140b;box-shadow:0 0 12px var(--ac-glow);cursor:pointer}
+.btn.ghost{background:transparent;color:var(--t-sec);border:1px solid var(--b-def);margin-top:6px;font-weight:400;box-shadow:none}
+.vh{padding:6px 12px 6px;font-size:10px;color:var(--t-mut);letter-spacing:.4px;text-transform:uppercase;display:flex;align-items:center}
+.vh .br{margin-left:auto;font-size:10px;color:var(--ac-h);text-transform:none;letter-spacing:0;border:1px solid #1c3a28;border-radius:5px;padding:2px 7px;cursor:pointer}
+.variants{display:flex;gap:8px;padding:0 12px}
+.variant{flex:1;border:1px solid var(--b-def);border-radius:8px;background:var(--panel);padding:10px 8px;text-align:center;transition:all .25s var(--ease)}
+.variant.win{border-color:var(--ac);background:rgba(34,197,94,.05);box-shadow:0 0 16px rgba(34,197,94,.12)}
+.variant.lose{opacity:.45}
+.ring{width:42px;height:42px;border-radius:50%;margin:0 auto 7px;background:conic-gradient(var(--ac) calc(var(--p,0)*1%),#23272e 0);display:flex;align-items:center;justify-content:center;position:relative;transition:background .4s var(--ease)}
+.ring::before{content:'';position:absolute;inset:4px;border-radius:50%;background:var(--panel)}
+.variant.win .ring::before{background:#10241a}
+.ring span{position:relative;font-size:11px;font-family:var(--mono);color:var(--ac-br)}
+.ring.spin{animation:ringspin 1s linear infinite}@keyframes ringspin{to{transform:rotate(360deg)}}
+.variant .vn{font-size:11px;color:var(--t-pri);font-weight:600}.variant .vs{font-size:9px;color:var(--t-mut);font-family:var(--mono);margin-top:2px}
+.variant.win .vs{color:var(--ac-br)}
+.promote{margin:10px 12px;border:1px dashed var(--b-def);border-radius:7px;padding:9px;font-size:11px;color:var(--t-sec);text-align:center;opacity:0;transition:opacity .3s}
+.promote.show{opacity:1;border-color:#1c3a28;color:var(--ac-br);background:rgba(34,197,94,.04)}
+.nudge{margin:10px 12px;border:1px solid #1c3a28;border-radius:8px;background:rgba(34,197,94,.06);padding:11px;font-size:12px;color:var(--ac-br);font-weight:600;text-align:center;opacity:0;transition:opacity .3s}
+.nudge.show{opacity:1;animation:armpulse 1.6s var(--ease) infinite}
+@keyframes armpulse{0%,100%{box-shadow:0 0 0 rgba(74,222,128,0)}50%{box-shadow:0 0 18px var(--ac-glow)}}
+.statusbar{display:flex;align-items:center;gap:16px;padding:0 12px;background:var(--panel);border-top:1px solid var(--b-subtle);font-size:10px;color:var(--t-mut);font-family:var(--mono)}
+.statusbar b{color:var(--ac-br)}.statusbar .s-ok{color:var(--ok)}.statusbar .sp{margin-left:auto}
+.director{width:1480px;display:flex;align-items:center;gap:14px;padding:10px 14px;background:#0e1014;border:1px solid var(--b-def);border-radius:8px}
+.director .play{background:var(--ac);color:#06140b;border:0;border-radius:6px;padding:7px 16px;font-weight:600;font-size:12px;cursor:pointer}
+.director .replay{background:transparent;border:1px solid var(--b-def);color:var(--t-sec);border-radius:6px;padding:7px 12px;cursor:pointer;font-size:12px}
+.beats{display:flex;gap:6px;margin-left:8px}
+.beat{display:flex;align-items:center;gap:7px;font-size:11px;color:var(--t-mut);cursor:pointer;padding:4px 8px;border-radius:999px}
+.beat .bd{width:7px;height:7px;border-radius:50%;background:#2c3640}
+.beat.on{color:var(--ac-br);background:var(--ac-soft)}.beat.on .bd{background:var(--ac);box-shadow:0 0 8px var(--ac-glow)}.beat.done .bd{background:var(--ok)}
+.director .cap{margin-left:auto;font-family:var(--mono);font-size:10px;color:var(--t-sec)}
+</style>
+</head>
+<body>
+<div class="tool-window">
+  <div class="toolbar">
+    <div class="glyph">F</div><div class="brand">Forge<span class="sub">· D2C · live inspector</span></div>
+    <div class="spacer"></div>
+    <div class="badge">d2c-engine ⇆ stdio · <b>generating locally</b></div>
+    <div class="livepill"><span class="dot pulse"></span> Pixel 8 · API 34 · live</div>
+  </div>
+  <div class="mode">
+    <div class="m on">Generate<span class="badge2" id="mBadge">tk-9f31</span><span class="under"></span></div>
+    <div class="m">Mirror</div>
+    <div class="m">Eval &amp; History</div>
+    <div class="right" id="modeRight">run · Chat → Compose · steer the plan, don't re-prompt</div>
+  </div>
+
+  <div class="main">
+    <!-- LEFT -->
+    <div class="col">
+      <div class="ph"><span class="ttl">Screens</span><span class="meta">3 runs</span></div>
+      <div class="scroll">
+        <div class="grp">This session</div>
+        <div class="rrow on"><div class="ic"></div>ChatThread<span class="mut">now</span></div>
+        <div class="rrow"><div class="ic"></div>Profile<span class="mut">88%</span></div>
+        <div class="rrow"><div class="ic"></div>Feed<span class="mut">90%</span></div>
+        <div class="grp">Recent</div>
+        <div class="rrow"><div class="ic"></div>PublicScreen<span class="mut">v2</span></div>
+        <div class="rrow"><div class="ic"></div>BottomToast<span class="mut">85%</span></div>
+      </div>
+    </div>
+
+    <!-- CENTER -->
+    <div class="col center">
+      <div class="ph"><span class="ttl">Agent</span><span class="meta" id="cMeta">live-device + IDE</span></div>
+      <div class="tl" id="tl">
+        <div class="turn"><div class="av user">M</div><div class="tc"><div class="who"><b>You</b> · 0:00</div><div class="bubble user">Generate the Chat screen from <span class="lk">figma…/Chat 412-88</span> → into the module</div></div></div>
+        <div class="turn"><div class="av agent">F</div><div class="tc">
+          <div class="who"><b>Forge agent</b> · 0:02<span class="tag">live-device + IDE</span></div>
+          <div class="bubble">Parsed <b>38 nodes</b>. Here's the plan — <b>edit any step before I run it</b>.
+            <div class="reason" id="reason"><span class="rh" id="rh">▶ reasoning · why this split</span><div class="rb">Header is a AppTopBar (matched to the live app's TopAppBar). Messages are a vertical list → LazyColumn for recycling. Send row = TextField + icon button. Bubble shape from the design's 14/14/4/14 radius.</div></div>
+            <div class="plan" id="plan">
+              <div class="pt">Generation plan<span class="e">✎ editable · drag to reorder</span></div>
+              <div class="pstep done"><span class="sd">✓</span><span class="ed">Scaffold ChatThreadScreen()</span></div>
+              <div class="pstep done"><span class="sd">✓</span><span class="ed">Header → AppTopBar + avatar</span></div>
+              <div class="pstep queued" id="step3"><span class="sd">3</span><span class="ed" id="step3ed">Message list → LazyColumn</span><span class="pe">edited · agent will re-run this step</span></div>
+              <div class="pstep queued"><span class="sd">4</span><span class="ed">Send bar → Row + TextField</span></div>
+              <div class="pstep add"><span class="sd">+</span><span class="ed">add a step…</span></div>
+            </div>
+            <div class="files" id="files">
+              <div class="fr" id="fr1"><span class="add">+ chat/ChatThreadScreen.kt</span><span class="ln">+148</span></div>
+              <div class="fr" id="fr2"><span class="add">+ chat/MessageBubble.kt</span><span class="ln">+44</span></div>
+              <div class="fr" id="fr3"><span class="add">+ chat/Composer.kt</span><span class="ln">+37</span><span class="fid" style="margin-left:8px">Fidelity 91%</span></div>
+            </div>
+          </div></div>
+      </div>
+      <div class="prail" id="prail">
+        <b id="p0">parse</b><b id="p1">tree</b><b id="p2">generate</b><b id="p3">render</b><b id="p4">fidelity</b><b id="p5">live-diff</b>
+      </div>
+      <div class="composer">
+        <div class="ctabs"><span class="ctab on">Ask</span><span class="ctab">Refine</span><span class="ctab">Apply-all</span></div>
+        <div class="cbox" id="cbox">Steer the agent…<span class="send">▸</span></div>
+        <div class="chips"><span class="qchip">Stabilize the header</span><span class="qchip">Fix all amber findings</span><span class="qchip">Diff against running app</span></div>
+      </div>
+    </div>
+
+    <!-- RIGHT -->
+    <div class="col">
+      <div class="ph"><span class="ttl">Generate</span><span class="meta" id="rMeta">Chat · 412-88</span></div>
+      <div class="scroll">
+        <div class="gcard">
+          <div class="figrow">figma.com/design/8xK…/Chat?node-id=412-88<span style="margin-left:auto;color:var(--t-mut)">◰</span></div>
+          <div class="selrow"><div class="sel2">Material 3<span class="cv">▾</span></div><div class="sel2">Compose<span class="cv">▾</span></div></div>
+          <button class="btn" id="genBtn">Generate → write to module</button>
+          <button class="btn ghost">Fast (structure only)</button>
+        </div>
+        <div class="vh">Variants<span class="br" id="branchBtn">branch ×3 ⎇</span></div>
+        <div class="variants" id="variants">
+          <div class="variant lose" id="vXml"><div class="ring" style="--p:0"><span id="vXmlN">—</span></div><div class="vn">XML</div><div class="vs" id="vXmlS">idle</div></div>
+          <div class="variant" id="vCmp"><div class="ring" style="--p:0"><span id="vCmpN">—</span></div><div class="vn">Compose</div><div class="vs" id="vCmpS">idle</div></div>
+          <div class="variant lose" id="vNat"><div class="ring" style="--p:0"><span id="vNatN">—</span></div><div class="vn">Native</div><div class="vs" id="vNatS">idle</div></div>
+        </div>
+        <div class="promote" id="promote">drag winner → module · losers kept as history</div>
+        <div class="nudge" id="nudge">✓ Written to sandbox · Open Mirror →</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="statusbar">
+    <span class="s-ok">● local engine offline-mode</span>
+    <span id="stMid">38 nodes · plan ready · edit before run</span>
+    <span class="sp" id="stLast">steer the plan, don't re-prompt</span>
+  </div>
+</div>
+
+<div class="director">
+  <button class="play" id="playBtn">▶ Play generate</button>
+  <button class="replay" id="replayBtn">⟲ Reset</button>
+  <div class="beats" id="beats">
+    <div class="beat" data-s="0"><span class="bd"></span>Plan</div>
+    <div class="beat" data-s="1"><span class="bd"></span>Steer</div>
+    <div class="beat" data-s="2"><span class="bd"></span>Generate</div>
+    <div class="beat" data-s="3"><span class="bd"></span>Variants</div>
+    <div class="beat" data-s="4"><span class="bd"></span>Pick winner</div>
+    <div class="beat" data-s="5"><span class="bd"></span>→ Mirror</div>
+  </div>
+  <div class="cap" id="dirCap">editable plan → steer → files land in the sandbox → variants race → hand off to Mirror</div>
+</div>
+
+<script>
+(function(){
+  var $=function(id){return document.getElementById(id);};
+  var timers=[];
+  function after(ms,fn){var t=setTimeout(fn,ms);timers.push(t);return t;}
+  function clearAll(){timers.forEach(clearTimeout);timers=[];}
+  function setBeat(n){[].forEach.call($('beats').children,function(b){var s=+b.dataset.s;b.classList.toggle('on',s===n);b.classList.toggle('done',s<n);});}
+  function cap(t){$('dirCap').textContent=t;}
+  function rail(states){['p0','p1','p2','p3','p4','p5'].forEach(function(id,i){$(id).className=states[i]||'';});}
+  function setRing(pre,p,label,spin){var r=$(pre).querySelector('.ring');r.style.setProperty('--p',p);r.classList.toggle('spin',!!spin);$(pre+'N').textContent=p?p+'%':'—';if(label)$(pre+'S').textContent=label;}
+
+  function gotoBeat(n){
+    clearAll();setBeat(n);
+    // reset dynamic bits
+    $('reason').classList.remove('open');
+    $('step3').className='pstep queued';$('step3ed').textContent='Message list → LazyColumn';
+    ['fr1','fr2','fr3'].forEach(function(id){$(id).classList.remove('in');});
+    rail(['','','','','','']);
+    setRing('vXml',0,'idle');setRing('vCmp',0,'idle');setRing('vNat',0,'idle');
+    $('vXml').className='variant lose';$('vCmp').className='variant';$('vNat').className='variant lose';
+    $('promote').classList.remove('show');$('nudge').classList.remove('show');
+    $('mBadge').textContent='tk-9f31';
+    if(n>=1){$('step3').className='pstep edited';$('step3ed').textContent='Message list → LazyColumn + pull-to-refresh';$('stMid').textContent='1 step edited · agent will re-run it';cap('② Double-click a step → "+ pull-to-refresh". Steer structurally, not by re-prompting.');}
+    if(n===0){$('stMid').textContent='38 nodes · plan ready · edit before run';$('stLast').textContent='steer the plan, don’t re-prompt';cap('① The plan IS the control surface — editable, not a read-only log.');}
+    if(n>=2){rail(['done','done','done','now','','']);$('fr1').classList.add('in');$('fr2').classList.add('in');$('step3').className='pstep done';$('step3').querySelector('.sd').textContent='✓';$('stMid').textContent='generating locally · files landing in sandbox';cap('③ Run → files land in the sandbox SANDBOX (not your codebase).');}
+    if(n>=3){$('fr3').classList.add('in');rail(['done','done','done','done','now','']);$('mBadge').textContent='⎇ 3';
+      setRing('vXml',72,'72% · xml');setRing('vCmp',91,'91% · compose');setRing('vNat',64,'64% · native');
+      $('stMid').textContent='3 variants racing locally · fidelity climbing';cap('④ Branch ×3 — XML / Compose / Native race locally, fidelity rings tick up.');}
+    if(n>=4){$('vCmp').className='variant win';$('vXml').className='variant lose';$('vNat').className='variant lose';
+      $('promote').classList.add('show');$('promote').textContent='✓ Compose wins (91%) · promoted → src/main · others kept as history';
+      $('stMid').textContent='Compose variant promoted to module';cap('⑤ Compose wins — drag it to the module; the losers stay dimmed as kept history.');}
+    if(n>=5){rail(['done','done','done','done','done','now']);$('nudge').classList.add('show');$('stLast').textContent='written to sandbox · ready to mirror';$('stMid').textContent='fidelity 91% · diffing vs live';cap('⑥ Written & scored → "Open Mirror →" to diff it against your running app.');}
+  }
+  window.gotoBeat=gotoBeat;
+
+  $('rh').addEventListener('click',function(){$('reason').classList.toggle('open');});
+  $('beats').addEventListener('click',function(e){var b=e.target.closest('.beat');if(b)gotoBeat(+b.dataset.s);});
+  $('branchBtn').addEventListener('click',function(){gotoBeat(3);});
+  $('genBtn').addEventListener('click',function(){gotoBeat(2);});
+
+  function reset(){clearAll();gotoBeat(0);}
+  function play(){
+    reset();var T=0;var seq=function(ms,fn){after(T+=ms,fn);};
+    seq(900,function(){gotoBeat(0);});
+    seq(1700,function(){ // steer: editing animation
+      $('step3').classList.add('editing');gotoBeat(1);});
+    seq(1600,function(){$('step3').classList.remove('editing');gotoBeat(2);});
+    seq(2000,function(){gotoBeat(3);});
+    seq(2000,function(){ // race the rings up before picking
+      setRing('vXml',72,'72% · xml');setRing('vCmp',91,'91% · compose');setRing('vNat',64,'64% · native');});
+    seq(900,function(){gotoBeat(4);});
+    seq(1700,function(){gotoBeat(5);});
+  }
+  $('playBtn').addEventListener('click',play);
+  $('replayBtn').addEventListener('click',reset);
+
+  reset();
+  after(700,play);
+})();
+</script>
+</body>
+</html>
