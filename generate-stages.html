@@ -1,0 +1,306 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Forge — Generate (preview-centric)</title>
+<style>
+:root{
+  --base:#121417;--panel:#181B20;--elev:#1F242B;--hover:#1C2128;--sel:#272E36;--input:#0E1013;--code:#0E1116;
+  --b-subtle:#21252B;--b-def:#2C313A;--b-strong:#444A54;
+  --t-pri:#E6E8EB;--t-sec:#9AA0A6;--t-mut:#6B6F78;--t-code:#B8C0CC;
+  --ac:#22C55E;--ac-h:#4ADE80;--ac-br:#86EFAC;--ac-soft:#0E2818;--ac-glow:rgba(74,222,128,.35);
+  --am:#E0B24D;--am-soft:#2A2310;--ok:#6FAE8C;--warn:#C7A77B;--dng:#CC8585;--info:#88A9C4;--purple:#C49AD0;
+  --mono:"SF Mono",ui-monospace,"JetBrains Mono",Menlo,Consolas,monospace;--sans:-apple-system,"Inter","Segoe UI",Roboto,sans-serif;--ease:cubic-bezier(0.2,0,0,1);
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%}
+body{background:#08090b;font-family:var(--sans);color:var(--t-pri);font-size:12px;-webkit-font-smoothing:antialiased;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;overflow:hidden;height:100vh}
+.tool-window{width:1480px;height:860px;background:var(--base);border:1px solid var(--b-def);border-radius:8px;display:grid;grid-template-rows:40px 28px 1fr 26px;overflow:hidden;box-shadow:0 24px 80px rgba(0,0,0,.6)}
+.mono{font-family:var(--mono)}
+.toolbar{display:flex;align-items:center;gap:10px;padding:0 12px;background:var(--panel);border-bottom:1px solid var(--b-subtle)}
+.glyph{width:20px;height:20px;border-radius:6px;background:linear-gradient(145deg,#22C55E,#16833f);display:flex;align-items:center;justify-content:center;font-weight:700;font-size:12px;color:#06140b;box-shadow:0 0 12px var(--ac-glow)}
+.brand{font-size:15px;font-weight:600}.brand .sub{color:var(--t-mut);font-weight:400;font-size:11px;margin-left:4px}
+.spacer{flex:1}
+.badge{font-family:var(--mono);font-size:9px;color:var(--t-mut);border:1px solid var(--b-def);border-radius:999px;padding:3px 8px}.badge b{color:var(--ac-h)}
+.livepill{display:flex;align-items:center;gap:6px;font-size:11px;color:var(--t-sec);border:1px solid var(--b-def);border-radius:999px;padding:3px 9px}
+.dot{width:7px;height:7px;border-radius:50%;background:var(--ac);box-shadow:0 0 8px var(--ac)}.dot.pulse{animation:breath 2.2s var(--ease) infinite}
+@keyframes breath{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.45;transform:scale(.78)}}
+.mode{display:flex;align-items:center;gap:2px;padding:0 10px;background:var(--base);border-bottom:1px solid var(--b-subtle)}
+.m{position:relative;padding:0 12px;height:28px;line-height:28px;font-size:12px;color:var(--t-sec)}
+.m.on{color:var(--t-pri);font-weight:500}.m.on .under{position:absolute;left:8px;right:8px;bottom:0;height:2px;background:var(--ac);border-radius:2px;box-shadow:0 0 8px var(--ac-glow)}
+.mode .right{margin-left:auto;font-family:var(--mono);font-size:10px;color:var(--t-mut)}.mode .right b{color:var(--ac-h)}
+.main{display:grid;grid-template-columns:262px 1fr 360px;gap:1px;background:var(--b-subtle);overflow:hidden;min-height:0}
+.col{background:var(--panel);display:flex;flex-direction:column;min-height:0;overflow:hidden}.col.center{background:var(--base)}
+.ph{height:40px;flex:0 0 40px;display:flex;align-items:center;gap:8px;padding:0 12px;border-bottom:1px solid var(--b-subtle)}
+.ph .ttl{font-size:13px;font-weight:600}.ph .meta{margin-left:auto;font-size:10px;color:var(--t-mut);font-family:var(--mono)}
+.scroll{overflow:hidden;flex:1;min-height:0}
+/* LEFT tree */
+.sandtag{margin:8px 12px;font-size:10px;color:var(--am);background:var(--am-soft);border:1px solid #3a3015;border-radius:6px;padding:6px 9px;line-height:1.4}
+.sandtag b{color:var(--ac-br)}
+.frow{display:flex;align-items:center;gap:7px;height:25px;font-size:12px;color:var(--t-sec);cursor:pointer;border-left:2px solid transparent;white-space:nowrap;padding-right:8px;opacity:.32;transition:opacity .3s var(--ease)}
+.frow:hover{background:var(--hover)}.frow.sel{background:var(--sel);border-left-color:var(--ac);color:var(--t-pri)}
+.frow.landed,.frow.dir{opacity:1}
+.frow .tw{width:12px;text-align:center;color:var(--t-mut);font-size:9px;flex:0 0 12px}
+.frow .fi{width:13px;flex:0 0 13px;text-align:center;font-size:10px}
+.frow.kt .fi{color:var(--info)}.frow.xml .fi{color:var(--warn)}.frow.dir .fi{color:var(--t-mut)}
+.frow .mut{margin-left:auto;font-family:var(--mono);font-size:9px;color:var(--ok);opacity:0;transition:opacity .25s}
+.frow.landed .mut{opacity:1}
+/* CENTER: stages strip + hero preview */
+.stagestrip{display:flex;align-items:center;justify-content:center;gap:0;height:54px;flex:0 0 54px;border-bottom:1px solid var(--b-subtle);padding:0 24px}
+.stage{display:flex;align-items:center;gap:8px;flex:0 0 auto}
+.stage .num{width:24px;height:24px;border-radius:50%;border:1px solid var(--b-strong);display:flex;align-items:center;justify-content:center;font-size:11px;font-family:var(--mono);color:var(--t-mut);flex:0 0 24px;transition:all .3s var(--ease)}
+.stage .lab{font-size:12px;color:var(--t-mut);transition:color .3s var(--ease)}.stage .lab .ls{font-family:var(--mono);font-size:9px;color:var(--t-mut);margin-left:6px;opacity:0;transition:opacity .3s}
+.stage.active .num{border-color:var(--ac);color:var(--ac-br);border-width:2px;box-shadow:0 0 12px var(--ac-glow)}
+.stage.active .lab{color:var(--t-pri);font-weight:600}.stage.active .lab .ls{opacity:1;color:var(--ac-h)}
+.stage.running .num{border-color:var(--ac);border-top-color:transparent;animation:spin .8s linear infinite;color:transparent}
+@keyframes spin{to{transform:rotate(360deg)}}
+.stage.done .num{background:var(--ac-soft);border-color:#1c3a28;color:var(--ac-br)}.stage.done .lab{color:var(--t-sec)}.stage.done .lab .ls{opacity:1;color:var(--ok)}
+.conn{flex:0 0 64px;height:2px;background:#23272e;margin:0 16px;border-radius:2px;position:relative;overflow:hidden}
+.conn i{position:absolute;inset:0;width:0;background:linear-gradient(90deg,var(--ac),var(--ac-h));transition:width .5s var(--ease)}.conn.fill i{width:100%}
+.stagebody{flex:1;min-height:0;position:relative;display:flex;flex-direction:column;align-items:center;justify-content:center;background:radial-gradient(120% 90% at 50% 32%,#16191e,#0e1013 72%)}
+.preview-cap{position:absolute;top:16px;left:50%;transform:translateX(-50%);font-family:var(--mono);font-size:10px;color:var(--t-mut)}.preview-cap b{color:var(--ac-br)}
+/* hero device */
+.hero{position:relative;width:296px;height:632px;border-radius:30px;background:#05070a;border:1px solid #2a3038;box-shadow:0 34px 80px rgba(0,0,0,.6),inset 0 0 0 6px #0c0f13,0 0 0 1px rgba(34,197,94,.05);padding:7px}
+.notch{position:absolute;top:11px;left:50%;transform:translateX(-50%);width:100px;height:19px;background:#05070a;border-radius:0 0 13px 13px;z-index:6}
+.screen{position:absolute;inset:7px;border-radius:23px;overflow:hidden;background:#0f1216;display:flex;flex-direction:column}
+.s-bar{height:23px;display:flex;align-items:center;justify-content:space-between;padding:0 15px;font-size:8px;color:#7a828c;font-family:var(--mono)}
+.s-appbar{height:46px;display:flex;align-items:center;gap:9px;padding:0 13px;border-bottom:1px solid #1b2026}
+.s-av{width:28px;height:28px;border-radius:50%;background:linear-gradient(135deg,#3a4250,#222833)}
+.s-title{font-size:11px;font-weight:600;color:#e6e8eb}.s-title .st2{display:block;font-size:8px;color:#6FAE8C;font-weight:400}
+.s-appbar .s-ic{margin-left:auto;color:#6b727c;font-size:13px}
+.s-list{flex:1;padding:13px 13px 9px;display:flex;flex-direction:column;gap:11px;overflow:hidden}
+.bub{max-width:74%;padding:8px 11px;font-size:10px;line-height:1.35}
+.bub.them{align-self:flex-start;background:#1c222b;color:#cfd4da;border-radius:14px 14px 14px 4px}
+.bub.me{align-self:flex-end;background:#173a26;color:#bdf0d0;border-radius:14px 14px 4px 14px}
+.s-composer{height:46px;display:flex;align-items:center;gap:9px;padding:0 13px;border-top:1px solid #1b2026}
+.s-field{flex:1;height:28px;border-radius:14px;background:#161b21;border:1px solid #232a31}
+.s-send{width:30px;height:30px;border-radius:50%;background:var(--ac);box-shadow:0 0 10px var(--ac-glow);display:flex;align-items:center;justify-content:center;color:#06140b;font-size:13px}
+/* preview states */
+.screen .real{position:absolute;inset:0;display:flex;flex-direction:column;opacity:0;transition:opacity .5s var(--ease)}
+.hero.rendered .screen .real{opacity:1}
+.buildoverlay{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;background:#0f1216;z-index:3;transition:opacity .5s var(--ease)}
+.hero.rendered .buildoverlay{opacity:0;pointer-events:none}
+.bspin{width:26px;height:26px;border:3px solid #222a33;border-top-color:var(--ac);border-radius:50%;animation:spin .8s linear infinite}
+.bstat{font-family:var(--mono);font-size:11px;color:var(--t-sec)}
+.skel{position:absolute;left:13px;right:13px;top:60px;display:flex;flex-direction:column;gap:11px}
+.skel div{height:26px;border-radius:13px;background:linear-gradient(90deg,#171c22,#1d242b,#171c22);background-size:200% 100%;animation:sh 1.2s linear infinite}
+.skel div:nth-child(2){width:60%;align-self:flex-end;background:linear-gradient(90deg,#15241c,#1a2c22,#15241c)}
+.skel div:nth-child(3){width:80%}
+@keyframes sh{to{background-position:-200% 0}}
+.hero.rendered .skel{display:none}
+.pedestal{position:absolute;bottom:36px;width:300px;height:30px;border-radius:50%;background:radial-gradient(closest-side,rgba(34,197,94,.10),transparent);filter:blur(2px)}
+/* RIGHT conversation */
+.conv{flex:1;min-height:0;display:flex;flex-direction:column}
+.tl{flex:1;min-height:0;overflow:hidden;padding:12px 14px 0;display:flex;flex-direction:column;gap:11px}
+.turn{display:flex;gap:9px}
+.av{width:23px;height:23px;border-radius:6px;flex:0 0 23px;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700}
+.av.user{background:#222833;color:#9aa0a6}.av.agent{background:linear-gradient(145deg,#22C55E,#16833f);color:#06140b;box-shadow:0 0 8px var(--ac-glow)}
+.tc{flex:1;min-width:0}
+.who{font-size:9px;color:var(--t-mut);margin-bottom:4px}.who b{color:var(--t-sec)}.who .tag{color:var(--ac-h);font-family:var(--mono);font-size:8px;border:1px solid #1c3a28;border-radius:999px;padding:0 5px;margin-left:5px}
+.bubble{background:var(--panel);border:1px solid var(--b-subtle);border-radius:8px;padding:8px 10px;font-size:11px;color:var(--t-pri);line-height:1.5}
+.bubble.user{background:var(--elev)}.bubble .lk{color:var(--info)}
+.plan{margin-top:8px;border:1px solid var(--b-def);border-radius:7px;background:var(--code);overflow:hidden}
+.plan .pt{padding:6px 9px;font-size:9px;color:var(--t-mut);border-bottom:1px solid var(--b-subtle);font-family:var(--mono)}
+.pstep{display:flex;align-items:center;gap:8px;padding:6px 9px;font-size:10px;color:var(--t-pri);border-bottom:1px solid #181d22}.pstep:last-child{border-bottom:0}
+.pstep .sd{width:12px;height:12px;border-radius:50%;flex:0 0 12px;display:flex;align-items:center;justify-content:center;font-size:8px}
+.pstep.done .sd{background:var(--ac-soft);color:var(--ac-br);border:1px solid #1c3a28}.pstep.queued .sd{border:1px solid var(--b-strong);color:var(--t-mut)}
+.pstep.edited{background:var(--am-soft)}.pstep.edited .sd{border:1px solid #3a3015;color:var(--am)}.pstep .pe{margin-left:auto;font-family:var(--mono);font-size:8px;color:var(--am);opacity:0}.pstep.edited .pe{opacity:1}
+.fres{margin-top:7px;font-family:var(--mono);font-size:10px;color:var(--ok);line-height:1.7}.fres .mut{color:var(--t-mut)}
+.composer{border-top:1px solid var(--b-subtle);padding:10px 14px}
+.chips{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px}
+.qchip{font-size:10px;color:var(--t-sec);border:1px solid var(--b-def);border-radius:999px;padding:3px 9px;cursor:pointer}.qchip:hover{background:var(--hover);color:var(--t-pri)}
+.cbox{background:var(--input);border:1px solid var(--b-def);border-radius:8px;padding:9px 11px;font-size:12px;color:var(--t-mut);display:flex;align-items:center}
+.cbox.focus{border-color:var(--ac);box-shadow:0 0 0 2px rgba(34,197,94,.12)}
+.cbox .send{margin-left:auto;width:24px;height:24px;border-radius:5px;background:var(--ac);color:#06140b;display:flex;align-items:center;justify-content:center;font-size:12px;box-shadow:0 0 8px var(--ac-glow)}
+.statusbar{display:flex;align-items:center;gap:16px;padding:0 12px;background:var(--panel);border-top:1px solid var(--b-subtle);font-size:10px;color:var(--t-mut);font-family:var(--mono)}
+.statusbar b{color:var(--ac-br)}.statusbar .s-ok{color:var(--ok)}.statusbar .sp{margin-left:auto}
+.director{width:1480px;display:flex;align-items:center;gap:14px;padding:10px 14px;background:#0e1014;border:1px solid var(--b-def);border-radius:8px}
+.director .play{background:var(--ac);color:#06140b;border:0;border-radius:6px;padding:7px 16px;font-weight:600;font-size:12px;cursor:pointer}.director .play:hover{background:var(--ac-h)}
+.director .replay{background:transparent;border:1px solid var(--b-def);color:var(--t-sec);border-radius:6px;padding:7px 12px;cursor:pointer;font-size:12px}
+.beats{display:flex;gap:6px;margin-left:8px}
+.beat{display:flex;align-items:center;gap:7px;font-size:11px;color:var(--t-mut);cursor:pointer;padding:4px 8px;border-radius:999px}
+.beat .bd{width:7px;height:7px;border-radius:50%;background:#2c3640}
+.beat.on{color:var(--ac-br);background:var(--ac-soft)}.beat.on .bd{background:var(--ac);box-shadow:0 0 8px var(--ac-glow)}.beat.done .bd{background:var(--ok)}
+.director .cap{margin-left:auto;font-family:var(--mono);font-size:10px;color:var(--t-sec)}
+</style>
+</head>
+<body>
+<div class="tool-window">
+  <div class="toolbar">
+    <div class="glyph">F</div><div class="brand">Forge<span class="sub">· Design-to-Code</span></div>
+    <div class="spacer"></div>
+    <div class="badge">codegen engine ⇆ stdio · <b id="badgeTxt">generating locally</b></div>
+    <div class="livepill"><span class="dot pulse"></span> Pixel 8 · API 34 · live</div>
+  </div>
+  <div class="mode">
+    <div class="m on">Generate<span class="under"></span></div>
+    <div class="m">Mirror</div>
+    <div class="m">Eval &amp; History</div>
+    <div class="right" id="modeRight">Chat · 412-88 → Compose · preview-centric</div>
+  </div>
+
+  <div class="main">
+    <!-- LEFT: generated file tree -->
+    <div class="col">
+      <div class="ph"><span class="ttl">Generated files</span><span class="meta" id="lMeta">0 files</span></div>
+      <div class="scroll">
+        <div class="sandtag">↳ written to the <b>sandbox demo project</b><br>not your open project · accept later to integrate</div>
+        <div id="tree">
+          <div class="frow dir"><span class="tw">▾</span><span class="fi">▸</span><span class="nm">app · sandbox</span></div>
+          <div class="frow dir" style="padding-left:14px"><span class="tw">▾</span><span class="fi">▸</span><span class="nm">kotlin/…/chat</span></div>
+          <div class="frow kt" data-file="screen" style="padding-left:30px"><span class="tw">·</span><span class="fi">K</span><span class="nm">ChatThreadScreen.kt</span><span class="mut">+148</span></div>
+          <div class="frow kt" data-file="bubble" style="padding-left:30px"><span class="tw">·</span><span class="fi">K</span><span class="nm">MessageBubble.kt</span><span class="mut">+96</span></div>
+          <div class="frow kt" data-file="composer" style="padding-left:30px"><span class="tw">·</span><span class="fi">K</span><span class="nm">Composer.kt</span><span class="mut">+37</span></div>
+          <div class="frow kt" data-file="colors" style="padding-left:30px"><span class="tw">·</span><span class="fi">K</span><span class="nm">ChatColors.kt</span><span class="mut">+18</span></div>
+          <div class="frow dir" style="padding-left:14px"><span class="tw">▾</span><span class="fi">▸</span><span class="nm">res</span></div>
+          <div class="frow xml" data-file="icon" style="padding-left:30px"><span class="tw">·</span><span class="fi">X</span><span class="nm">drawable/ic_send.xml</span><span class="mut">new</span></div>
+          <div class="frow xml" data-file="vals" style="padding-left:30px"><span class="tw">·</span><span class="fi">X</span><span class="nm">values/colors.xml</span><span class="mut">+4</span></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- CENTER: stages strip + hero preview -->
+    <div class="col center">
+      <div class="stagestrip">
+        <div class="stage" id="stGen"><span class="num">1</span><span class="lab">Generation<span class="ls" id="lsGen">queued</span></span></div>
+        <div class="conn" id="c1"><i></i></div>
+        <div class="stage" id="stCmp"><span class="num">2</span><span class="lab">Compile<span class="ls" id="lsCmp">queued</span></span></div>
+        <div class="conn" id="c2"><i></i></div>
+        <div class="stage" id="stPrv"><span class="num">3</span><span class="lab">Preview<span class="ls" id="lsPrv">queued</span></span></div>
+      </div>
+      <div class="stagebody">
+        <div class="preview-cap" id="pvCap">live preview · rendered from the compiled sandbox</div>
+        <div class="pedestal"></div>
+        <div class="hero" id="hero">
+          <div class="notch"></div>
+          <div class="screen">
+            <div class="buildoverlay">
+              <div class="bspin" id="bspin"></div>
+              <div class="bstat" id="bstat">generating…</div>
+              <div class="skel"><div></div><div></div><div></div></div>
+            </div>
+            <div class="real">
+              <div class="s-bar"><span>9:41</span><span>▮▮ ▾ ▰</span></div>
+              <div class="s-appbar"><div class="s-av"></div><div class="s-title">Aria Chen<span class="st2">online</span></div><div class="s-ic">⋮</div></div>
+              <div class="s-list"><div class="bub them">Hey! are we still on for the design review?</div><div class="bub me">yes — pushing the build now 🚀</div><div class="bub them">love it. ping me when it's up</div></div>
+              <div class="s-composer"><div class="s-field"></div><div class="s-send">➤</div></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- RIGHT: conversation -->
+    <div class="col">
+      <div class="ph"><span class="ttl">Agent</span><span class="meta">live-device + IDE</span></div>
+      <div class="conv">
+        <div class="tl" id="tl">
+          <div class="turn"><div class="av user">M</div><div class="tc"><div class="who"><b>You</b> · 0:00</div><div class="bubble user">Generate the Chat screen from <span class="lk">figma…/Chat 412-88</span> → into the module</div></div></div>
+          <div class="turn"><div class="av agent">F</div><div class="tc">
+            <div class="who"><b>Forge</b> · 0:02<span class="tag">live-device + IDE</span></div>
+            <div class="bubble">Parsed <b>38 nodes</b>. Plan — edit any step before I run it:
+              <div class="plan">
+                <div class="pt">generation plan · ✎ editable</div>
+                <div class="pstep done"><span class="sd">✓</span>Scaffold ChatThreadScreen()</div>
+                <div class="pstep done"><span class="sd">✓</span>Header → AppTopBar</div>
+                <div class="pstep" id="ps3"><span class="sd">3</span>Message list → LazyColumn<span class="pe">edited</span></div>
+                <div class="pstep"><span class="sd">4</span>Send bar → Row + TextField</div>
+              </div>
+              <div class="fres" id="fres" style="display:none">✓ 6 files → sandbox · compiled 0.8s · <span class="mut">rendered</span> 91%</div>
+            </div></div></div>
+        </div>
+        <div class="composer">
+          <div class="chips"><span class="qchip">Regenerate the bubble</span><span class="qchip">Stabilize header</span><span class="qchip">Open in Mirror →</span></div>
+          <div class="cbox" id="cbox">Ask or steer Forge…<span class="send">▸</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="statusbar">
+    <span class="s-ok">● local engine offline-mode</span>
+    <span id="stMid">3 stages · Generation → Compile → Preview</span>
+    <span class="sp" id="stLast">generating in sandbox</span>
+  </div>
+</div>
+
+<div class="director">
+  <button class="play" id="playBtn">▶ Play stages</button>
+  <button class="replay" id="replayBtn">⟲ Reset</button>
+  <div class="beats" id="beats">
+    <div class="beat" data-s="0"><span class="bd"></span>Generation</div>
+    <div class="beat" data-s="1"><span class="bd"></span>Generated</div>
+    <div class="beat" data-s="2"><span class="bd"></span>Compile</div>
+    <div class="beat" data-s="3"><span class="bd"></span>Compiled</div>
+    <div class="beat" data-s="4"><span class="bd"></span>Preview</div>
+    <div class="beat" data-s="5"><span class="bd"></span>Done</div>
+  </div>
+  <div class="cap" id="dirCap">files (left) · stages + preview (center) · conversation (right)</div>
+</div>
+
+<script>
+(function(){
+  var $=function(id){return document.getElementById(id);};
+  var timers=[];
+  function after(ms,fn){var t=setTimeout(fn,ms);timers.push(t);return t;}
+  function clearAll(){timers.forEach(clearTimeout);timers=[];}
+  function setBeat(n){[].forEach.call($('beats').children,function(b){var s=+b.dataset.s;b.classList.toggle('on',s===n);b.classList.toggle('done',s<n);});}
+  function cap(t){$('dirCap').textContent=t;}
+  function stage(el,cls){$(el).className='stage'+(cls?' '+cls:'');}
+  function ls(el,t){$(el).textContent=t;}
+
+  function gotoBeat(n){
+    clearAll();setBeat(n);
+    document.querySelectorAll('#tree .frow[data-file]').forEach(function(r){r.classList.remove('landed','sel');});
+    stage('stGen','');stage('stCmp','');stage('stPrv','');ls('lsGen','queued');ls('lsCmp','queued');ls('lsPrv','queued');
+    $('c1').classList.remove('fill');$('c2').classList.remove('fill');
+    $('hero').classList.remove('rendered');$('badgeTxt').textContent='generating locally';$('fres').style.display='none';
+    $('bstat').textContent='generating…';$('bspin').style.display='';$('pvCap').innerHTML='live preview · rendered from the compiled sandbox';
+
+    if(n===0){stage('stGen','active running');ls('lsGen','running…');
+      var fs=['screen','bubble','composer'];fs.forEach(function(f,i){after(i*220,function(){var r=document.querySelector('#tree .frow[data-file='+f+']');if(r)r.classList.add('landed');});});
+      $('lMeta').textContent='generating…';$('bstat').textContent='generating Compose…';$('stMid').textContent='Stage 1 · generating into sandbox';$('stLast').textContent='files landing (left)';
+      cap('① Generation — LLM writes Compose into the sandbox; files land in the LEFT tree.');}
+    if(n===1){stage('stGen','done');ls('lsGen','✓ 6 files');stage('stCmp','active');$('c1').classList.add('fill');
+      document.querySelectorAll('#tree .frow[data-file]').forEach(function(r){r.classList.add('landed');});
+      $('bstat').textContent='generated · awaiting compile';$('lMeta').textContent='6 files';$('stMid').textContent='generated · 6 files in sandbox';$('stLast').textContent='click a file to read its code';
+      cap('② Generated — 6 files in the sandbox tree (left). Plan ran; ready to compile.');}
+    if(n===2){stage('stGen','done');ls('lsGen','✓ 6 files');stage('stCmp','active running');ls('lsCmp','running…');$('c1').classList.add('fill');
+      document.querySelectorAll('#tree .frow[data-file]').forEach(function(r){r.classList.add('landed');});
+      $('bstat').textContent='./gradlew · compiling sandbox…';$('stMid').textContent='Stage 2 · compiling sandbox (seconds)';$('stLast').textContent='assembleDebug';
+      cap('③ Compile — the small sandbox builds locally in seconds (not your remote app).');}
+    if(n===3){stage('stGen','done');stage('stCmp','done');ls('lsGen','✓ 6 files');ls('lsCmp','✓ 0.8s');stage('stPrv','active');$('c1').classList.add('fill');$('c2').classList.add('fill');
+      document.querySelectorAll('#tree .frow[data-file]').forEach(function(r){r.classList.add('landed');});
+      $('bstat').textContent='✓ compiled · rendering…';$('stMid').textContent='BUILD SUCCESSFUL 0.8s';$('stLast').textContent='rendering preview';
+      cap('③ Compiled — BUILD SUCCESSFUL. Rendering the preview…');}
+    if(n>=4){stage('stGen','done');stage('stCmp','done');stage('stPrv','active running');ls('lsGen','✓ 6 files');ls('lsCmp','✓ 0.8s');ls('lsPrv','rendering…');
+      $('c1').classList.add('fill');$('c2').classList.add('fill');document.querySelectorAll('#tree .frow[data-file]').forEach(function(r){r.classList.add('landed');});
+      $('hero').classList.add('rendered');$('badgeTxt').textContent='preview ready';$('fres').style.display='';$('pvCap').innerHTML='live preview · <b>fidelity 91%</b> · the canvas everything builds on';
+      $('stMid').textContent='Stage 3 · rendered from compiled sandbox';$('stLast').textContent='preview ready · 91%';
+      cap('④ Preview — the HERO. The compiled sandbox renders dead-center; features layer on top of this.');}
+    if(n===5){stage('stPrv','done');ls('lsPrv','✓ rendered');
+      $('stMid').textContent='✓ generated · compiled · preview ready';$('stLast').textContent='steer on the right · or → Mirror';
+      cap('⑤ Done — preview is live. Steer it from the conversation (right), or move to Mirror.');}
+  }
+  window.gotoBeat=gotoBeat;
+
+  document.querySelectorAll('#tree .frow[data-file]').forEach(function(r){r.addEventListener('click',function(){
+    document.querySelectorAll('#tree .frow').forEach(function(x){x.classList.remove('sel');});r.classList.add('sel');});});
+  $('beats').addEventListener('click',function(e){var b=e.target.closest('.beat');if(b)gotoBeat(+b.dataset.s);});
+
+  function reset(){clearAll();gotoBeat(0);}
+  function play(){
+    reset();var T=0;var seq=function(ms,fn){after(T+=ms,fn);};
+    seq(900,function(){gotoBeat(0);});
+    seq(2200,function(){gotoBeat(1);});
+    seq(1700,function(){gotoBeat(2);});
+    seq(1700,function(){gotoBeat(3);});
+    seq(1300,function(){gotoBeat(4);});
+    seq(1800,function(){gotoBeat(5);});
+  }
+  $('playBtn').addEventListener('click',play);$('replayBtn').addEventListener('click',reset);
+  reset();after(700,play);
+})();
+</script>
+</body>
+</html>
